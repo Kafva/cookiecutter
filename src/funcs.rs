@@ -13,7 +13,7 @@ fn is_db_with_table(conn: &rusqlite::Connection, table_name: &str) -> bool {
 }
 
 /// Finds all SQLite databases under the given path
-/// which feature either a `cookies` or `moz_cookies` table
+/// which feature a non-empty `cookies` or `moz_cookies` table
 pub fn is_cookie_db(filepath:&Path) -> Result<DbType,io::Error> {
     let mut f = File::open(filepath)?;
     let mut buf = [0; 15];
@@ -56,6 +56,5 @@ mod tests {
         let result = is_cookie_db(Path::new("./moz_cookies.sqlite"));
         assert!( matches!(result.unwrap(), DbType::Firefox) );
     }
-
 }
 
