@@ -2,7 +2,7 @@ use std::io::Read; // Enables the use of .read_exact()
 use std::io;
 use std::fs::File;
 use std::path::Path;
-use crate::config::DbType;
+use crate::types::DbType;
 
 fn is_db_with_table(conn: &rusqlite::Connection, table_name: &str) -> bool {
     return conn.query_row::<u32,_,_>(

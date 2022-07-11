@@ -3,7 +3,7 @@ use clap::Parser;
 
 // A `static` lifetime infers that a variable will be defined in 
 // the RO section of a binary
-pub const COOKIE_DB_NAMES: &'static [&str] = &[
+pub const DB_NAMES: &'static [&str] = &[
     "Cookies",
     "Safe Browsing Cookies",
     "cookies.sqlite"
@@ -25,7 +25,6 @@ pub const SEARCH_DIRS: &'static [&str] = &[
     "Library/Application Support/BraveSoftware/Brave-Browser"
 ];
 
-
 //=== Argument parsing ===//
 #[derive(Parser, Debug)]
 #[clap(version = "1.0", author = "Kafva <https://github.com/Kafva>", 
@@ -43,7 +42,6 @@ pub struct Args {
     #[clap(short, long)]
     debug: bool
 }
-
 
 //=== Config object ===//
 #[derive(Debug)]
@@ -64,41 +62,11 @@ impl Config {
     }
     /// Used to access the global config object in the program
     pub fn global() -> &'static Self {
-        CONFIG.get().expect("Initialised config object")
+        CONFIG.get()
+            .expect("No globally initialised Config object exists")
     }
 }
 
-/// Safe one-shot initalisation of a global
+/// Safe one-shot initialisation of a global
 ///  https://docs.rs/once_cell/1.4.0/once_cell/
 pub static CONFIG: OnceCell<Config> = OnceCell::new();
-
-
-//=== Types ===//
-
-/// The PartialEq trait allows us to use `matches!` to check
-/// equality between enums
-#[derive(PartialEq)]
-pub enum DbType {
-    Chrome, Firefox, Unknown
-}
-
-
-//=== Macros ===//
-#[macro_export]
-macro_rules! errln {
-    // Match one or more expressions to this arm
-    ( $($x:expr),* ) => (
-        eprint!("\x1b[31m!>\x1b[0m ");
-        eprintln!($($x)*);
-    )
-}
-#[macro_export]
-macro_rules! debugln {
-    // Match one or more expressions to this arm
-    ( $($x:expr),* ) => (
-        if CONFIG::global().debug {
-            print!("\x1b[34m!>\x1b[0m ");
-            println!($($x)*);
-        }
-    )
-}
