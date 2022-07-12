@@ -1,3 +1,7 @@
+*.sqlite-wal
+*.sqlite-shm
+ex.txt
+cmonster.sh
 *.sqlite
 .lego
 *.vrb

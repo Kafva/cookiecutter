@@ -14,7 +14,7 @@ fn is_db_with_table(conn: &rusqlite::Connection, table_name: &str) -> bool {
 
 /// Finds all SQLite databases under the given path
 /// which feature a non-empty `cookies` or `moz_cookies` table
-pub fn is_cookie_db(filepath:&Path) -> Result<DbType,io::Error> {
+pub fn cookie_db_type(filepath:&Path) -> Result<DbType,io::Error> {
     let mut f = File::open(filepath)?;
     let mut buf = [0; 15];
 
@@ -48,13 +48,13 @@ pub fn is_cookie_db(filepath:&Path) -> Result<DbType,io::Error> {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
-    use crate::is_cookie_db;
-    use crate::config::DbType;
+    use crate::cookie_db_type;
+    use crate::types::DbType;
 
     #[test]
     fn test_is_cookie_db() {
-        let result = is_cookie_db(Path::new("./moz_cookies.sqlite"));
-        assert!( matches!(result.unwrap(), DbType::Firefox) );
+        let result = cookie_db_type(Path::new("./moz_cookies.sqlite"));
+        assert!(matches!(result.unwrap(), DbType::Firefox));
     }
 }
 

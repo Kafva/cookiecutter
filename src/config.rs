@@ -32,7 +32,7 @@ pub const SEARCH_DIRS: &'static [&str] = &[
 pub struct Args {
     /// List all cookies across all browsers
     #[clap(short, long)]
-    list: bool,
+    pub list: bool,
 
     /// Quiet mode, only print the domains for each cookie when using '-l'
     #[clap(short, long)]

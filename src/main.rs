@@ -1,13 +1,14 @@
 //=== Package imports ===//
 use walkdir::WalkDir;
-use clap::Parser;
+use clap::{Parser,CommandFactory};
 
 //=== Project imports ===//
 mod config;
 mod funcs;
 mod types;
+mod cookie_db;
 use crate::config::{Args,Config,CONFIG,SEARCH_DIRS,DB_NAMES};
-use crate::funcs::is_cookie_db;
+use crate::funcs::cookie_db_type;
 use crate::types::{DbType,CookieDB};
 
 fn main() -> Result<(),()> {
@@ -37,13 +38,14 @@ fn main() -> Result<(),()> {
 
             if entry.file_type().is_file() && 
              DB_NAMES.contains(&entry.file_name().to_string_lossy().as_ref()) {
-                let db_type = is_cookie_db(&(entry.path())).unwrap_or_else(|_| {
+                let db_type = cookie_db_type(&(entry.path())).unwrap_or_else(|_| {
                     return DbType::Unknown;
                 });
                 if ! matches!(db_type, DbType::Unknown) {
                     cookie_dbs.push( CookieDB { 
                         path: entry.into_path().to_owned(),
-                        typing: db_type 
+                        typing: db_type, 
+                        cookies: vec![]
                     })
                 }
             }
@@ -51,6 +53,14 @@ fn main() -> Result<(),()> {
     }
 
     debugln!("{:#?}", cookie_dbs);
+
+    if args.list && cookie_dbs.len() > 0 {
+        cookie_dbs[0].load_cookies().expect("Failed to load cookies");
+        println!("{:#?}", cookie_dbs[0].cookies[0]);
+    } else {
+       let mut args_cmd = Args::command();
+       args_cmd.print_help().unwrap();
+    }
 
     return Ok(());
 }
