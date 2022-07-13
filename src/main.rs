@@ -6,6 +6,7 @@ use clap::{Parser,CommandFactory};
 mod config;
 mod funcs;
 mod types;
+mod cookie;
 mod cookie_db;
 use crate::config::{Args,Config,CONFIG,SEARCH_DIRS,DB_NAMES};
 use crate::funcs::cookie_db_type;

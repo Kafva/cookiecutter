@@ -1,18 +1,4 @@
 use crate::types::{DbType,CookieDB,Cookie,CookieField};
-use chrono::{TimeZone,Utc};
-use std::fmt;
-
-impl fmt::Display for Cookie {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, concat!(
-            "Cookie {{\n  host: \"{}\"\n  name: \"{}\"\n  value: \"{}\"\n  ",
-            "path:  \"{}\"\n  creation: \"{}\" ({})\n  expiry: \"{}\" ({})\n}}"),
-            self.host, self.name, self.value, self.path,
-            Utc.timestamp(self.creation,0), self.creation,
-            Utc.timestamp(self.expiry,0), self.expiry
-        )
-    }
-}
 
 impl CookieDB {
     /// Fetch the name of the cookies table depending on
@@ -42,14 +28,19 @@ impl CookieDB {
             (CookieField::Expiry, DbType::Firefox) => "expiry",
             (CookieField::Expiry, DbType::Chrome) => "expires_utc",
 
-            _ => "???"
+            _ => panic!("Unknown `CookieField` parameter")
         }
     }
 
     /// Timestamps are stored internally as UNIX epoch microseconds
     /// for Firefox and as microseconds since Jan 01 1601 in Chrome
+    ///
+    /// Cookies with a Session-only lifetime will have 0 as their
+    /// expiry date in Chrome
     fn get_unix_epoch(self: &Self, timestamp:i64) -> i64 {
-        if self.typing == DbType::Firefox {
+        if timestamp == 0 {
+            0
+        } else if self.typing == DbType::Firefox {
             timestamp/1_000_000
         } else {
             (timestamp/1_000_000) - 11_644_473_600 
