@@ -4,11 +4,12 @@ use std::fmt;
 
 impl fmt::Display for Cookie {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, 
-            "Cookie {{\n  host: {}\n  name: {}\n  value: \"{}\"\n  path:  {}\n  creation: {}\n  expiry: {}\n}}",
+        write!(f, concat!(
+            "Cookie {{\n  host: \"{}\"\n  name: \"{}\"\n  value: \"{}\"\n  ",
+            "path:  \"{}\"\n  creation: \"{}\" ({})\n  expiry: \"{}\" ({})\n}}"),
             self.host, self.name, self.value, self.path,
-            Utc.timestamp(self.creation,0),
-            Utc.timestamp(self.expiry,0)
+            Utc.timestamp(self.creation,0), self.creation,
+            Utc.timestamp(self.expiry,0), self.expiry
         )
     }
 }
@@ -51,8 +52,6 @@ impl CookieDB {
         if self.typing == DbType::Firefox {
             timestamp/1_000_000
         } else {
-            // This seems to be ~30 min off when comparing with
-            // the represensiton in Chrome
             (timestamp/1_000_000) - 11_644_473_600 
         }
     }

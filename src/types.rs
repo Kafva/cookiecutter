@@ -15,7 +15,6 @@ pub enum CookieField {
     Expiry
 }
 
-
 #[derive(Debug)]
 pub struct Cookie {
     /// The domain that created the cookie 
