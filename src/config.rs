@@ -29,8 +29,11 @@ pub const SEARCH_DIRS: &'static [&str] = &[
 //=== CLI arguments ===//
 #[derive(Debug,Subcommand)]
 enum SubArgs {
-    /// List cookies to stdout
-    List {
+    /// List cookie databases
+    Dbs {
+    },
+    /// List cookies from all databases to stdout
+    Cookies {
         /// Skip filepath headings
         #[clap(short, long, takes_value = false)]
         no_heading: bool,
@@ -76,6 +79,7 @@ pub struct Config {
     pub whitelist: PathBuf,
     pub no_heading: bool,
     pub fields: String,
+    pub profiles: bool
 }
 
 impl Default for Config {
@@ -85,7 +89,8 @@ impl Default for Config {
             debug: false,
             whitelist: PathBuf::default(),
             no_heading: false,
-            fields: String::from("")
+            fields: String::from(""),
+            profiles: false
         }
     }
 }
@@ -95,14 +100,15 @@ impl Config {
     pub fn from_args(args: Args) -> Self {
         let mut cfg = Config::default();
         match args.subargs {
-            Some(SubArgs::List { no_heading, fields }) => {
+            Some(SubArgs::Dbs {  }) => {
+                cfg.profiles = true; cfg
+            }
+            Some(SubArgs::Cookies { no_heading, fields }) => {
                 cfg.no_heading = no_heading;
-                cfg.fields = fields;
-                cfg
+                cfg.fields = fields; cfg
             }
             Some(SubArgs::Clean { whitelist }) => {
-                cfg.whitelist = whitelist.to_path_buf();
-                cfg
+                cfg.whitelist = whitelist.to_path_buf(); cfg
             }
             _ => panic!("Unknown argument")
         }
