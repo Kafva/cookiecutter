@@ -1,5 +1,6 @@
+use std::path::PathBuf;
 use once_cell::sync::OnceCell;
-use clap::Parser;
+use clap::{Parser,Subcommand};
 
 // A `static` lifetime infers that a variable will be defined in 
 // the RO section of a binary
@@ -25,39 +26,85 @@ pub const SEARCH_DIRS: &'static [&str] = &[
     "Library/Application Support/BraveSoftware/Brave-Browser"
 ];
 
-//=== Argument parsing ===//
+//=== CLI arguments ===//
+#[derive(Debug,Subcommand)]
+enum SubArgs {
+    /// List cookies to stdout
+    List {
+        /// Skip filepath headings
+        #[clap(short, long, takes_value = false)]
+        no_heading: bool,
+
+        /// Comma separated list of fields to list
+        ///     Possible values:
+        ///     host,name,value,path,creation,expiry
+        #[clap(short, long, default_value = "host")]
+        fields: String,
+    },
+    /// Remove cookies non-interactively
+    Clean {
+        /// Keep cookies from specified domains
+        #[clap(short, long, required = false)]
+        whitelist: PathBuf,
+    }
+}
+
+
 #[derive(Parser, Debug)]
 #[clap(version = "1.0", author = "Kafva <https://github.com/Kafva>", 
   about = "Cookie manager")]
 pub struct Args {
-    /// List all cookies across all browsers
-    #[clap(short, long)]
-    pub list: bool,
-
-    /// Quiet mode, only print the domains for each cookie when using '-l'
-    #[clap(short, long)]
-    quiet: bool,
-
     /// Debug mode
     #[clap(short, long)]
-    debug: bool
+    debug: bool,
+
+    /// Open a TUI were cookies across all installed browsers can be viewed
+    /// and manipulated
+    #[clap(short, long)]
+    tui: bool,
+
+    #[clap(subcommand)]
+    subargs: Option<SubArgs>
 }
 
-//=== Config object ===//
+
+//=== Config ===//
 #[derive(Debug)]
 pub struct Config {
     pub err_exit: i32,
     pub debug: bool,
-    pub quiet: bool
+    pub whitelist: PathBuf,
+    pub no_heading: bool,
+    pub fields: String,
+}
+
+impl Default for Config {
+    fn default() -> Self {  
+        Config {
+            err_exit: 1,
+            debug: false,
+            whitelist: PathBuf::default(),
+            no_heading: false,
+            fields: String::from("")
+        }
+    }
 }
 
 impl Config {
-    /// Used to initialise a new config object
-    pub fn from_args(args: &Args) -> Self {
-        Config { 
-            err_exit: 1,
-            debug: args.debug,
-            quiet: args.quiet
+    /// Initialise a new config object from an Args struct
+    pub fn from_args(args: Args) -> Self {
+        let mut cfg = Config::default();
+        match args.subargs {
+            Some(SubArgs::List { no_heading, fields }) => {
+                cfg.no_heading = no_heading;
+                cfg.fields = fields;
+                cfg
+            }
+            Some(SubArgs::Clean { whitelist }) => {
+                cfg.whitelist = whitelist.to_path_buf();
+                cfg
+            }
+            _ => panic!("Unknown argument")
         }
     }
     /// Used to access the global config object in the program
@@ -67,6 +114,7 @@ impl Config {
     }
 }
 
-/// Safe one-shot initialisation of a global
+/// Global configuration object
+/// Initialisation from CLI arguments using:
 ///  https://docs.rs/once_cell/1.4.0/once_cell/
 pub static CONFIG: OnceCell<Config> = OnceCell::new();

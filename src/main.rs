@@ -13,12 +13,12 @@ use crate::funcs::{cookie_db_type,process_is_running};
 use crate::types::{DbType,CookieDB};
 
 fn main() -> Result<(),()> {
-    // Load configuration from argv into a global
+    // Load command line configuration arguments into a global
     let args: Args = Args::parse();
-    let cfg = Config::from_args(&args);
+    let cfg = Config::from_args(args);
     CONFIG.set(cfg).unwrap();
 
-    // Verify that Firefox is not running since it locks the database.
+    // Verify that Firefox is not running since it locks the database
     if process_is_running("firefox") {
         errln!("Firefox needs to be closed");
         std::process::exit(Config::global().err_exit);
@@ -41,13 +41,13 @@ fn main() -> Result<(),()> {
         // we want to retain ownership of the variable for later use
         for entry in WalkDir::new(&search_path).follow_links(false)
            .into_iter().filter_map(|e| e.ok()) {
-            // By filtering on `e.ok()` inaccessible paths are skipped silently
-
+            // The filter is used to skip inaccessible paths 
             if entry.file_type().is_file() && 
              DB_NAMES.contains(&entry.file_name().to_string_lossy().as_ref()) {
-                let db_type = cookie_db_type(&(entry.path())).unwrap_or_else(|_| {
-                    return DbType::Unknown;
-                });
+                let db_type = cookie_db_type(&(entry.path()))
+                    .unwrap_or_else(|_| {
+                        return DbType::Unknown;
+                    });
                 if ! matches!(db_type, DbType::Unknown) {
                     cookie_dbs.push( CookieDB { 
                         path: entry.into_path().to_owned(),
@@ -61,7 +61,7 @@ fn main() -> Result<(),()> {
 
     debugln!("{:#?}", cookie_dbs);
 
-    if args.list && cookie_dbs.len() > 0 {
+    if !Config::global().debug && cookie_dbs.len() > 0 {
         let db = &mut cookie_dbs[0];
         db.load_cookies().expect("Failed to load cookies");
         for (i,c) in db.cookies.iter().enumerate() {
