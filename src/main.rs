@@ -17,6 +17,9 @@ fn main() -> Result<(),()> {
     let cfg = Config::from_args(&args);
     CONFIG.set(cfg).unwrap();
 
+    // TODO: verify that firefox is closed otherwise we cannot
+    // read the database
+
     // WSL support
     let home: String = if std::fs::metadata("/mnt/c/Users").is_ok() { 
         format!("/mnt/c/Users/{}", std::env::var("USER").unwrap())
@@ -55,8 +58,12 @@ fn main() -> Result<(),()> {
     debugln!("{:#?}", cookie_dbs);
 
     if args.list && cookie_dbs.len() > 0 {
-        cookie_dbs[0].load_cookies().expect("Failed to load cookies");
-        println!("{:#?}", cookie_dbs[0].cookies[0]);
+        cookie_dbs[2].load_cookies().expect("Failed to load cookies");
+        for (i,c) in cookie_dbs[2].cookies.iter().enumerate() {
+            if c.host == "en.wikipedia.org" {
+                println!("{i}: {}", c);
+            }
+        }
     } else {
        let mut args_cmd = Args::command();
        args_cmd.print_help().unwrap();

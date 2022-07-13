@@ -5,27 +5,32 @@ pub enum DbType {
     Chrome, Firefox, Unknown
 }
 
-//#[derive(Debug)]
-//pub enum CookieField {
-//    Creation = "creation_utc",
-//    Host = "host_key",
-//    Name = "name",
-//    Value = "value",
-//    Path = "path"
-//}
+/// The data fields that exist for each cookie
+pub enum CookieField {
+    Host,
+    Name,
+    Value,
+    Path,
+    Creation,
+    Expiry
+}
 
 
 #[derive(Debug)]
 pub struct Cookie {
     /// The domain that created the cookie 
     pub host: String,
-    /// The URL path of the domain where 
-    /// the cookie applies
-    pub path: String,
     /// The name of the cookie
     pub name: String,
     /// The value stored in the cookie
-    pub value: String 
+    pub value: String,
+    /// The URL path of the domain where 
+    /// the cookie applies
+    pub path: String,
+    /// The creation timestamp in UNIX epoch time
+    pub creation: i64,
+    /// The expiry timestamp in UNIX epoch time
+    pub expiry: i64
 }
 
 #[derive(Debug)]
