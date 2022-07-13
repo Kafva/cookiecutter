@@ -19,8 +19,10 @@ impl CookieDB {
             (CookieField::Host, DbType::Chrome) => "host_key",
 
             (CookieField::Name, _) => "name",
-            (CookieField::Value, _) => "value",
             (CookieField::Path, _) => "path",
+            // The value field in chrome is usually empty with content
+            // instead being present in `encrypted_value`
+            (CookieField::Value, _) => "value",
 
             (CookieField::Creation, DbType::Firefox) => "creationTime",
             (CookieField::Creation, DbType::Chrome) => "creation_utc",

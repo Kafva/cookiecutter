@@ -59,8 +59,9 @@ fn main() -> Result<(),()> {
     debugln!("{:#?}", cookie_dbs);
 
     if args.list && cookie_dbs.len() > 0 {
-        cookie_dbs[2].load_cookies().expect("Failed to load cookies");
-        for (i,c) in cookie_dbs[2].cookies.iter().enumerate() {
+        let db = &mut cookie_dbs[0];
+        db.load_cookies().expect("Failed to load cookies");
+        for (i,c) in db.cookies.iter().enumerate() {
             if c.host == "en.wikipedia.org" {
                 println!("{i}: {}", c);
             }
