@@ -30,6 +30,12 @@ impl CookieDB {
             (CookieField::Expiry, DbType::Firefox) => "expiry",
             (CookieField::Expiry, DbType::Chrome) => "expires_utc",
 
+            (CookieField::HttpOnly, DbType::Firefox) => "isHttpOnly",
+            (CookieField::HttpOnly, DbType::Chrome) => "is_http_only",
+
+            (CookieField::LastAccess, DbType::Firefox) => "lastAccessed",
+            (CookieField::LastAccess, DbType::Chrome) => "last_access_utc",
+
             _ => panic!("Unknown `CookieField` parameter")
         }
     }
@@ -53,13 +59,16 @@ impl CookieDB {
     pub fn load_cookies(self: &mut Self) -> Result<(), rusqlite::Error> {
         let conn = rusqlite::Connection::open(&self.path)?;
 
-        let query = format!("SELECT {},{},{},{},{},{} FROM {};",
+        let query = format!(
+            "SELECT {},{},{},{},{},{},{},{} FROM {};",
              self.field_name(CookieField::Host),
              self.field_name(CookieField::Name),
              self.field_name(CookieField::Value),
              self.field_name(CookieField::Path),
              self.field_name(CookieField::Creation),
              self.field_name(CookieField::Expiry),
+             self.field_name(CookieField::LastAccess),
+             self.field_name(CookieField::HttpOnly),
              self.table_name()
         );
         let mut stmt = conn.prepare(&query)?;
@@ -77,7 +86,11 @@ impl CookieDB {
                     ),
                     expiry: self.get_unix_epoch(
                         row.get::<_,i64>(5)?
-                    )
+                    ),
+                    last_access: self.get_unix_epoch(
+                        row.get::<_,i64>(6)?
+                    ),
+                    http_only: row.get::<_,bool>(7)?
                 }
             )
         })?;

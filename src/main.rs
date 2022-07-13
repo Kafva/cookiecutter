@@ -1,16 +1,18 @@
 //=== Package imports ===//
 use walkdir::WalkDir;
+use strum::IntoEnumIterator;
 use clap::{Parser,CommandFactory};
 
 //=== Project imports ===//
 mod config;
 mod funcs;
+mod macros;
 mod types;
 mod cookie;
 mod cookie_db;
 use crate::config::{Args,Config,CONFIG,SEARCH_DIRS,DB_NAMES};
 use crate::funcs::{cookie_db_type,process_is_running};
-use crate::types::{DbType,CookieDB};
+use crate::types::{DbType,CookieDB,CookieField};
 
 fn main() -> Result<(),()> {
     // Load command line configuration arguments into a global
@@ -65,12 +67,20 @@ fn main() -> Result<(),()> {
             let db_path = c.path.to_string_lossy().replace(&home,"~");
             println!("  {}", db_path); 
         });
-    } else if Config::global().fields != "" && cookie_dbs.len() > 0 {
+    } else if Config::global().list_fields {
+        infoln!("Valid fields:");
+        for e in CookieField::iter() {
+            println!("  {:?}", e);
+        }
+    }
+    else if Config::global().fields != "" && cookie_dbs.len() > 0 {
         let db = &mut cookie_dbs[0];
         db.load_cookies().expect("Failed to load cookies");
+
+
         for (i,c) in db.cookies.iter().enumerate() {
             if c.host == "en.wikipedia.org" {
-                println!("{i}: {}", c);
+                println!("{i}: {:#?}", c);
             }
         }
     } else {

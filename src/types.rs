@@ -1,3 +1,6 @@
+use strum::EnumIter;
+
+
 /// The PartialEq trait allows us to use `matches!` to check
 /// equality between enums
 #[derive(Debug,PartialEq)]
@@ -6,13 +9,16 @@ pub enum DbType {
 }
 
 /// The data fields that exist for each cookie
+#[derive(EnumIter,Debug)]
 pub enum CookieField {
     Host,
     Name,
     Value,
     Path,
     Creation,
-    Expiry
+    Expiry,
+    LastAccess,
+    HttpOnly
 }
 
 #[derive(Debug)]
@@ -29,7 +35,11 @@ pub struct Cookie {
     /// The creation timestamp in UNIX epoch time
     pub creation: i64,
     /// The expiry timestamp in UNIX epoch time
-    pub expiry: i64
+    pub expiry: i64,
+    /// The last access timestamp in UNIX epoch time
+    pub last_access: i64,
+    /// If the cookie has HttpOnly set
+    pub http_only: bool
 }
 
 #[derive(Debug)]
@@ -37,45 +47,5 @@ pub struct CookieDB {
     pub path: std::path::PathBuf,
     pub typing: DbType,
     pub cookies: Vec<Cookie>
-}
-
-//=== Macros ===//
-#[macro_export]
-macro_rules! errln {
-    // Match one or more expressions to this arm
-    ( $($x:expr),* ) => (
-        eprint!("\x1b[91m!>\x1b[0m ");
-        eprintln!($($x)*);
-    )
-}
-#[macro_export]
-macro_rules! infoln {
-    // Match a fmt literal + one or more expressions
-    ( $fmt:literal, $($x:expr),* ) => (
-        print!("\x1b[94m!>\x1b[0m ");
-        println!($fmt, $($x)*);
-    );
-    // Match one or more expressions without a literal
-    ( $($x:expr),* ) => (
-        print!("\x1b[94m!>\x1b[0m ");
-        println!($($x)*);
-    )
-}
-#[macro_export]
-macro_rules! debugln {
-    // Match a fmt literal + one or more expressions
-    ( $fmt:literal, $($x:expr),* ) => (
-        if Config::global().debug {
-            print!("\x1b[94m!>\x1b[0m ");
-            println!($fmt, $($x)*);
-        }
-    );
-    // Match one or more expressions without a literal
-    ( $($x:expr),* ) => (
-        if Config::global().debug {
-            print!("\x1b[94m!>\x1b[0m ");
-            println!($($x)*);
-        }
-    )
 }
 

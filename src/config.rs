@@ -32,17 +32,20 @@ enum SubArgs {
     /// List cookie databases
     Dbs {
     },
-    /// List cookies from all databases to stdout
+    /// List cookies from all databases
     Cookies {
         /// Skip filepath headings
         #[clap(short, long, takes_value = false)]
         no_heading: bool,
 
+        /// List valid fields
+        #[clap(short, long, takes_value = false)]
+        list_fields: bool,
+
         /// Comma separated list of fields to list
-        ///     Possible values:
-        ///     host,name,value,path,creation,expiry
-        #[clap(short, long, default_value = "host")]
+        #[clap(short, long, default_value = "Host" )]
         fields: String,
+
     },
     /// Remove cookies non-interactively
     Clean {
@@ -79,7 +82,8 @@ pub struct Config {
     pub whitelist: PathBuf,
     pub no_heading: bool,
     pub fields: String,
-    pub profiles: bool
+    pub profiles: bool,
+    pub list_fields: bool
 }
 
 impl Default for Config {
@@ -90,7 +94,8 @@ impl Default for Config {
             whitelist: PathBuf::default(),
             no_heading: false,
             fields: String::from(""),
-            profiles: false
+            profiles: false,
+            list_fields: false
         }
     }
 }
@@ -103,8 +108,9 @@ impl Config {
             Some(SubArgs::Dbs {  }) => {
                 cfg.profiles = true; cfg
             }
-            Some(SubArgs::Cookies { no_heading, fields }) => {
+            Some(SubArgs::Cookies { no_heading, list_fields, fields }) => {
                 cfg.no_heading = no_heading;
+                cfg.list_fields = list_fields;
                 cfg.fields = fields; cfg
             }
             Some(SubArgs::Clean { whitelist }) => {
