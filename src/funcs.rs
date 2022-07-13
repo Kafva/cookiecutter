@@ -2,7 +2,25 @@ use std::io::Read; // Enables the use of .read_exact()
 use std::io;
 use std::fs::File;
 use std::path::Path;
+use sysinfo::{System, SystemExt, RefreshKind};
+
 use crate::types::DbType;
+
+/// Check if a process is running using the `sysinfo` library
+pub fn process_is_running(name: &str) -> bool {
+    let sys = System::new_with_specifics(
+        RefreshKind::everything()
+            .without_cpu()
+            .without_disks()
+            .without_networks()
+            .without_memory()
+            .without_components()
+            .without_users_list()
+    );
+    let found = sys.processes_by_exact_name(name)
+        .find_map(|_| Some(true)).is_some();
+    found
+}
 
 fn is_db_with_table(conn: &rusqlite::Connection, table_name: &str) -> bool {
     return conn.query_row::<u32,_,_>(

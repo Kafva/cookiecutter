@@ -9,7 +9,7 @@ mod types;
 mod cookie;
 mod cookie_db;
 use crate::config::{Args,Config,CONFIG,SEARCH_DIRS,DB_NAMES};
-use crate::funcs::cookie_db_type;
+use crate::funcs::{cookie_db_type,process_is_running};
 use crate::types::{DbType,CookieDB};
 
 fn main() -> Result<(),()> {
@@ -18,8 +18,11 @@ fn main() -> Result<(),()> {
     let cfg = Config::from_args(&args);
     CONFIG.set(cfg).unwrap();
 
-    // TODO: verify that firefox is closed otherwise we cannot
-    // read the database
+    // Verify that Firefox is not running since it locks the database.
+    if process_is_running("firefox") {
+        errln!("Firefox needs to be closed");
+        std::process::exit(Config::global().err_exit);
+    }
 
     // WSL support
     let home: String = if std::fs::metadata("/mnt/c/Users").is_ok() { 
