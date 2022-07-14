@@ -64,20 +64,20 @@ fn main() -> Result<(),()> {
         }
     }
 
-    //== Subcmd: dbs ==//
-    if Config::global().dbs {
-        infoln!("Cookie databases:");
-        cookie_dbs.iter().for_each(|c| {
-            let db_path = c.path.to_string_lossy().replace(&home,"~");
-            println!("  {}", db_path);
-        });
-    }
     //== Subcmd: cookies ==//
-    else if Config::global().list_fields {
+    if Config::global().list_fields {
         infoln!("Valid fields:");
         for e in CookieField::iter() {
             println!("  {:?}", e);
         }
+    }
+    else if Config::global().list_profiles {
+        infoln!("Valid profiles:");
+        cookie_dbs.iter().for_each(|c| {
+            let db_path = c.path.parent().unwrap()
+                .to_string_lossy().replace(&home,"~");
+            println!("  {}", db_path);
+        });
     }
     else if Config::global().fields != "" && cookie_dbs.len() > 0 {
         let db = &mut cookie_dbs[0];

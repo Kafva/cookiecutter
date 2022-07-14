@@ -29,18 +29,19 @@ pub const SEARCH_DIRS: &'static [&str] = &[
 //=== CLI arguments ===//
 #[derive(Debug,Subcommand)]
 enum SubArgs {
-    /// List cookie databases
-    Dbs {
-    },
-    /// List cookies from all databases
+    /// List cookies
     Cookies {
-        /// Skip filepath headings
+        /// Skip profile headings
         #[clap(short, long, takes_value = false)]
         no_heading: bool,
 
         /// List valid fields
-        #[clap(short, long, takes_value = false)]
+        #[clap(long, takes_value = false)]
         list_fields: bool,
+
+        /// List valid browser profiles
+        #[clap(long, takes_value = false)]
+        list_profiles: bool,
 
         /// Comma separated list of fields to list
         #[clap(short, long, default_value = "Host,Name")]
@@ -49,6 +50,10 @@ enum SubArgs {
         /// Only include entries matching a specific domain name
         #[clap(short, long, default_value = "")]
         domain: String,
+
+        /// Only include entries from a specific browser profile 
+        #[clap(short, long, default_value = "")]
+        profile: String,
     },
     /// Remove cookies non-interactively
     Clean {
@@ -88,11 +93,12 @@ pub struct Config {
     pub whitelist: PathBuf,
     pub no_heading: bool,
     pub fields: String,
-    pub dbs: bool,
+    pub list_profiles: bool,
     pub list_fields: bool,
     pub domain: String,
     pub nocolor: bool,
-    pub tui: bool
+    pub tui: bool,
+    pub profile: String
 }
 
 impl Default for Config {
@@ -103,11 +109,12 @@ impl Default for Config {
             whitelist: PathBuf::default(),
             no_heading: false,
             fields: String::from(""),
-            dbs: false,
+            list_profiles: false,
             list_fields: false,
             domain: String::from(""),
             nocolor: false,
-            tui: false
+            tui: false,
+            profile: String::from("")
         }
     }
 }
@@ -120,15 +127,14 @@ impl Config {
         cfg.debug   = args.debug;
 
         match args.subargs {
-            Some(SubArgs::Dbs {  }) => {
-                cfg.dbs = true; cfg
-            }
             Some(SubArgs::Cookies {
-                no_heading, list_fields, fields, domain
+                no_heading, list_fields, fields, domain, list_profiles, profile
             }) => {
                 cfg.no_heading = no_heading;
                 cfg.list_fields = list_fields;
                 cfg.domain = domain;
+                cfg.list_profiles = list_profiles;
+                cfg.profile = profile;
                 cfg.fields = fields; cfg
             }
             Some(SubArgs::Clean { whitelist }) => {
