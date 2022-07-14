@@ -2,6 +2,7 @@
 use walkdir::WalkDir;
 use strum::IntoEnumIterator;
 use clap::{Parser,CommandFactory};
+use std::str::FromStr;
 
 //=== Project imports ===//
 mod config;
@@ -27,7 +28,7 @@ fn main() -> Result<(),()> {
     }
 
     // WSL support
-    let home: String = if std::fs::metadata("/mnt/c/Users").is_ok() { 
+    let home: String = if std::fs::metadata("/mnt/c/Users").is_ok() {
         format!("/mnt/c/Users/{}", std::env::var("USER").unwrap())
     } else {
         std::env::var("HOME").unwrap()
@@ -43,17 +44,17 @@ fn main() -> Result<(),()> {
         // we want to retain ownership of the variable for later use
         for entry in WalkDir::new(&search_path).follow_links(false)
            .into_iter().filter_map(|e| e.ok()) {
-            // The filter is used to skip inaccessible paths 
-            if entry.file_type().is_file() && 
+            // The filter is used to skip inaccessible paths
+            if entry.file_type().is_file() &&
              DB_NAMES.contains(&entry.file_name().to_string_lossy().as_ref()) {
                 let db_type = cookie_db_type(&(entry.path()))
                     .unwrap_or_else(|_| {
                         return DbType::Unknown;
                     });
                 if ! matches!(db_type, DbType::Unknown) {
-                    cookie_dbs.push( CookieDB { 
+                    cookie_dbs.push( CookieDB {
                         path: entry.into_path().to_owned(),
-                        typing: db_type, 
+                        typing: db_type,
                         cookies: vec![]
                     })
                 }
@@ -61,13 +62,16 @@ fn main() -> Result<(),()> {
         }
     }
 
-    if Config::global().profiles {
+    //== Subcmd: dbs ==//
+    if Config::global().dbs {
         infoln!("Cookie databases:");
-        cookie_dbs.iter().for_each(|c| {  
+        cookie_dbs.iter().for_each(|c| {
             let db_path = c.path.to_string_lossy().replace(&home,"~");
-            println!("  {}", db_path); 
+            println!("  {}", db_path);
         });
-    } else if Config::global().list_fields {
+    }
+    //== Subcmd: cookies ==//
+    else if Config::global().list_fields {
         infoln!("Valid fields:");
         for e in CookieField::iter() {
             println!("  {:?}", e);
@@ -77,12 +81,34 @@ fn main() -> Result<(),()> {
         let db = &mut cookie_dbs[0];
         db.load_cookies().expect("Failed to load cookies");
 
+        // 1. Split the fields string and convert each string
+        // into a CookieField enum
+        let cookie_fields: Vec<CookieField> = Config::global().fields.split(",").map(|f| {
+           CookieField::from_str(f).expect("Invalid cookie field name")
+        }).collect();
 
-        for (i,c) in db.cookies.iter().enumerate() {
-            if c.host == "en.wikipedia.org" {
-                println!("{i}: {:#?}", c);
+        for c in db.cookies.iter() {
+            if Config::global().domain == "" || c.host.contains(&Config::global().domain) {
+                // 2. Iterate over the enums for each cookie and
+                // fetch the corresponding field value as a string
+                let values: Vec<String> = cookie_fields.iter().map(|f| {
+                    match f {
+                        CookieField::Host =>  { format!("host: {}", c.host.to_owned() ) },
+                        CookieField::Name =>  { format!("name: {}", c.name.to_owned() ) },
+                        CookieField::Value => { format!("value: {}", c.value.to_owned()) },
+                        CookieField::Path =>  { format!("path: {}", c.path.to_owned() ) },
+
+                        CookieField::Creation => { format!("creation: {}", c.creation) },
+                        CookieField::Expiry => { format!("expiry: {}", c.expiry) },
+                        CookieField::LastAccess => { format!("last_access: {}", c.last_access) },
+
+                        CookieField::HttpOnly => { format!("http_only: {}", c.http_only) },
+                    }
+                }).collect();
+
+                println!("{}\n", values.join("\n") );
             }
-        }
+         }
     } else {
        let mut args_cmd = Args::command();
        args_cmd.print_help().unwrap();

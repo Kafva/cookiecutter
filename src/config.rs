@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use once_cell::sync::OnceCell;
 use clap::{Parser,Subcommand};
 
-// A `static` lifetime infers that a variable will be defined in 
+// A `static` lifetime infers that a variable will be defined in
 // the RO section of a binary
 pub const DB_NAMES: &'static [&str] = &[
     "Cookies",
@@ -46,6 +46,9 @@ enum SubArgs {
         #[clap(short, long, default_value = "Host" )]
         fields: String,
 
+        /// Only include entries matching a specific domain name
+        #[clap(short, long, required = false )]
+        domain: String,
     },
     /// Remove cookies non-interactively
     Clean {
@@ -57,7 +60,7 @@ enum SubArgs {
 
 
 #[derive(Parser, Debug)]
-#[clap(version = "1.0", author = "Kafva <https://github.com/Kafva>", 
+#[clap(version = "1.0", author = "Kafva <https://github.com/Kafva>",
   about = "Cookie manager")]
 pub struct Args {
     /// Debug mode
@@ -82,20 +85,22 @@ pub struct Config {
     pub whitelist: PathBuf,
     pub no_heading: bool,
     pub fields: String,
-    pub profiles: bool,
-    pub list_fields: bool
+    pub dbs: bool,
+    pub list_fields: bool,
+    pub domain: String
 }
 
 impl Default for Config {
-    fn default() -> Self {  
+    fn default() -> Self {
         Config {
             err_exit: 1,
             debug: false,
             whitelist: PathBuf::default(),
             no_heading: false,
             fields: String::from(""),
-            profiles: false,
-            list_fields: false
+            dbs: false,
+            list_fields: false,
+            domain: String::from("")
         }
     }
 }
@@ -106,11 +111,14 @@ impl Config {
         let mut cfg = Config::default();
         match args.subargs {
             Some(SubArgs::Dbs {  }) => {
-                cfg.profiles = true; cfg
+                cfg.dbs = true; cfg
             }
-            Some(SubArgs::Cookies { no_heading, list_fields, fields }) => {
+            Some(SubArgs::Cookies {
+                no_heading, list_fields, fields, domain
+            }) => {
                 cfg.no_heading = no_heading;
                 cfg.list_fields = list_fields;
+                cfg.domain = domain;
                 cfg.fields = fields; cfg
             }
             Some(SubArgs::Clean { whitelist }) => {

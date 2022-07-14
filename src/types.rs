@@ -1,4 +1,4 @@
-use strum::EnumIter;
+use strum::{EnumIter,EnumString};
 
 
 /// The PartialEq trait allows us to use `matches!` to check
@@ -9,7 +9,7 @@ pub enum DbType {
 }
 
 /// The data fields that exist for each cookie
-#[derive(EnumIter,Debug)]
+#[derive(EnumIter,EnumString,Debug)]
 pub enum CookieField {
     Host,
     Name,

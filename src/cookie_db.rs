@@ -3,7 +3,7 @@ use crate::types::{DbType,CookieDB,Cookie,CookieField};
 impl CookieDB {
     /// Fetch the name of the cookies table depending on
     /// the browser type.
-    fn table_name(self: &Self) -> &'static str {
+    fn table_name(&self) -> &'static str {
         if self.typing == DbType::Firefox {
             "moz_cookies"
         } else {
@@ -13,7 +13,7 @@ impl CookieDB {
 
     /// Resolve the given Cookie field name to the
     /// corresponding key in the database for the browser type.
-    fn field_name(self: &Self, field_name: CookieField) -> &'static str {
+    fn field_name(&self, field_name: &CookieField) -> &'static str {
         match (field_name, &self.typing) {
             (CookieField::Host, DbType::Firefox) => "host",
             (CookieField::Host, DbType::Chrome) => "host_key",
@@ -51,24 +51,24 @@ impl CookieDB {
         } else if self.typing == DbType::Firefox {
             timestamp/1_000_000
         } else {
-            (timestamp/1_000_000) - 11_644_473_600 
+            (timestamp/1_000_000) - 11_644_473_600
         }
     }
 
     /// Load all cookies from the current `path` into the `cookies` vector
-    pub fn load_cookies(self: &mut Self) -> Result<(), rusqlite::Error> {
+    pub fn load_cookies(&mut self) -> Result<(), rusqlite::Error> {
         let conn = rusqlite::Connection::open(&self.path)?;
 
         let query = format!(
             "SELECT {},{},{},{},{},{},{},{} FROM {};",
-             self.field_name(CookieField::Host),
-             self.field_name(CookieField::Name),
-             self.field_name(CookieField::Value),
-             self.field_name(CookieField::Path),
-             self.field_name(CookieField::Creation),
-             self.field_name(CookieField::Expiry),
-             self.field_name(CookieField::LastAccess),
-             self.field_name(CookieField::HttpOnly),
+             self.field_name(&CookieField::Host),
+             self.field_name(&CookieField::Name),
+             self.field_name(&CookieField::Value),
+             self.field_name(&CookieField::Path),
+             self.field_name(&CookieField::Creation),
+             self.field_name(&CookieField::Expiry),
+             self.field_name(&CookieField::LastAccess),
+             self.field_name(&CookieField::HttpOnly),
              self.table_name()
         );
         let mut stmt = conn.prepare(&query)?;

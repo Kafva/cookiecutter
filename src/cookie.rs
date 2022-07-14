@@ -1,6 +1,5 @@
 use std::fmt;
 use chrono::{TimeZone,Utc};
-
 use crate::types::Cookie;
 
 impl fmt::Display for Cookie {
@@ -14,4 +13,3 @@ impl fmt::Display for Cookie {
         )
     }
 }
-
