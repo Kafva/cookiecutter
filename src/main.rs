@@ -10,7 +10,7 @@ mod types;
 mod cookie;
 mod cookie_db;
 use crate::config::{Args,Config,CONFIG,SEARCH_DIRS,DB_NAMES,COOKIE_FIELDS};
-use crate::funcs::{cookie_db_type,process_is_running,cookie_to_str};
+use crate::funcs::{cookie_db_type,process_is_running};
 use crate::types::{DbType,CookieDB};
 
 fn main() -> Result<(),()> {
@@ -80,7 +80,7 @@ fn main() -> Result<(),()> {
     else if Config::global().fields != "" && cookie_dbs.len() > 0 {
         for mut cookie_db in cookie_dbs {
             // Skip profiles if a specific --profile was passed
-            if Config::global().profile != "" && 
+            if Config::global().profile != "" &&
              !cookie_db.path.to_string_lossy()
               .contains(&Config::global().profile) {
                  continue;
@@ -96,7 +96,9 @@ fn main() -> Result<(),()> {
                 // Skip domains if a specific --domain was passed
                 if Config::global().domain == "" ||
                  c.host.contains(&Config::global().domain) {
-                    println!("{}\n", cookie_to_str(&c));
+                    println!("{}\n",
+                        c.fields_as_str(&Config::global().fields)
+                    );
                 }
              }
         }
