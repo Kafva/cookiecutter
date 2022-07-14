@@ -1,9 +1,8 @@
+use std::collections::HashSet;
 //=== Package imports ===//
 use walkdir::WalkDir;
-use strum::IntoEnumIterator;
 use clap::{Parser,CommandFactory};
 use chrono::{TimeZone,Utc};
-use std::str::FromStr;
 
 //=== Project imports ===//
 mod config;
@@ -12,9 +11,9 @@ mod macros;
 mod types;
 mod cookie;
 mod cookie_db;
-use crate::config::{Args,Config,CONFIG,SEARCH_DIRS,DB_NAMES};
+use crate::config::{Args,Config,CONFIG,SEARCH_DIRS,DB_NAMES,COOKIE_FIELDS};
 use crate::funcs::{cookie_db_type,process_is_running,field_fmt};
-use crate::types::{DbType,CookieDB,CookieField};
+use crate::types::{DbType,CookieDB};
 
 fn main() -> Result<(),()> {
     // Load command line configuration arguments into a global
@@ -36,7 +35,7 @@ fn main() -> Result<(),()> {
         std::env::var("HOME").unwrap()
     };
 
-    let mut cookie_dbs: Vec<CookieDB> = vec![];
+    let mut cookie_dbs: HashSet<CookieDB> = HashSet::new();
 
     for search_dir in SEARCH_DIRS {
         // 'home' needs to be cloned since it is referenced in each iteration
@@ -54,78 +53,83 @@ fn main() -> Result<(),()> {
                         return DbType::Unknown;
                     });
                 if ! matches!(db_type, DbType::Unknown) {
-                    cookie_dbs.push( CookieDB {
+                    cookie_dbs.insert( CookieDB {
                         path: entry.into_path().to_owned(),
                         typing: db_type,
                         cookies: vec![]
-                    })
+                    });
                 }
             }
         }
     }
 
+    let mut cookie_dbs = Vec::from_iter(cookie_dbs);
+    cookie_dbs.sort();
+
     //== Subcmd: cookies ==//
     if Config::global().list_fields {
         infoln!("Valid fields:");
-        for e in CookieField::iter() {
-            println!("  {:?}", e);
+        for field_name in COOKIE_FIELDS.keys() {
+            println!("  {:?}", field_name);
         }
     }
     else if Config::global().list_profiles {
-        infoln!("Valid profiles:");
+        infoln!("Profiles with a cookie database:");
         cookie_dbs.iter().for_each(|c| {
-            let db_path = c.path.parent().unwrap()
-                .to_string_lossy().replace(&home,"~");
-            println!("  {}", db_path);
+            println!("  {}", c.path_short(&home));
         });
     }
     else if Config::global().fields != "" && cookie_dbs.len() > 0 {
-        let db = &mut cookie_dbs[0];
-        db.load_cookies().expect("Failed to load cookies");
-
-        // 1. Split the fields string and convert each string
-        // into a CookieField enum
-        let cookie_fields: Vec<CookieField> = Config::global().fields.split(",")
-            .map(|f| {
-                CookieField::from_str(f).expect("Invalid cookie field name")
-            }).collect();
-
-        for c in db.cookies.iter() {
-            if Config::global().domain == "" ||
-             c.host.contains(&Config::global().domain) {
-                // 2. Iterate over the enums for each cookie and
-                // fetch the corresponding field value as a string
-                let values: Vec<String> = cookie_fields.iter().map(|f| {
-                    match f {
-                    CookieField::Host =>       {
-                        field_fmt("Host", c.host.to_owned() )
-                    },
-                    CookieField::Name =>       {
-                        field_fmt("Name", c.name.to_owned() )
-                    },
-                    CookieField::Value =>      {
-                        field_fmt("Value", c.value.to_owned())
-                    },
-                    CookieField::Path =>       {
-                        field_fmt("Path", c.path.to_owned() )
-                    },
-                    CookieField::Creation =>   {
-                        field_fmt("Creation", Utc.timestamp(c.creation, 0))
-                    },
-                    CookieField::Expiry =>     {
-                        field_fmt("Expiry", Utc.timestamp(c.expiry,0))
-                    },
-                    CookieField::LastAccess => {
-                        field_fmt("LastAccess", Utc.timestamp(c.last_access,0))
-                    },
-                    CookieField::HttpOnly =>   {
-                        field_fmt("HttpOnly", c.http_only)
-                    },
-                }}).collect();
-
-                println!("{}\n", values.join("\n") );
+        for mut cookie_db in cookie_dbs {
+            // Skip profiles if a specific --profile was passed
+            if Config::global().profile != "" && 
+             !cookie_db.path.to_string_lossy()
+              .contains(&Config::global().profile) {
+                 continue;
             }
-         }
+            if !Config::global().no_heading {
+                infoln!("{}",cookie_db.path_short(&home));
+            }
+
+            cookie_db.load_cookies().expect("Failed to load cookies");
+
+            for c in cookie_db.cookies.iter() {
+                if Config::global().domain == "" ||
+                 c.host.contains(&Config::global().domain) {
+                    let mut values: Vec<String> = COOKIE_FIELDS.keys().map(|f| {
+                        match *f {
+                        "Host" =>       {
+                            field_fmt("Host", c.host.to_owned() )
+                        },
+                        "Name" =>       {
+                            field_fmt("Name", c.name.to_owned() )
+                        },
+                        "Value" =>      {
+                            field_fmt("Value", c.value.to_owned())
+                        },
+                        "Path" =>       {
+                            field_fmt("Path", c.path.to_owned() )
+                        },
+                        "Creation" =>   {
+                            field_fmt("Creation", Utc.timestamp(c.creation, 0))
+                        },
+                        "Expiry" =>     {
+                            field_fmt("Expiry", Utc.timestamp(c.expiry,0))
+                        },
+                        "LastAccess" => {
+                            field_fmt("LastAccess", Utc.timestamp(c.last_access,0))
+                        },
+                        "HttpOnly" =>   {
+                            field_fmt("HttpOnly", c.http_only)
+                        },
+                        _ => panic!("Unknown cookie field")
+                    }}).collect();
+
+                    values.sort();
+                    println!("{}\n", values.join("\n") );
+                }
+             }
+        }
     } else {
        let mut args_cmd = Args::command();
        args_cmd.print_help().unwrap();

@@ -1,6 +1,13 @@
-use crate::types::{DbType,CookieDB,Cookie,CookieField};
+use crate::config::COOKIE_FIELDS;
+use crate::types::{DbType,CookieDB,Cookie};
 
 impl CookieDB {
+    /// Replace the given `home` string with "~"
+    pub fn path_short(&self,home: &str) -> String {
+        self.path.parent().unwrap()
+            .to_string_lossy().replace(home,"~")
+    }
+
     /// Fetch the name of the cookies table depending on
     /// the browser type.
     fn table_name(&self) -> &'static str {
@@ -8,35 +15,6 @@ impl CookieDB {
             "moz_cookies"
         } else {
             "cookies"
-        }
-    }
-
-    /// Resolve the given Cookie field name to the
-    /// corresponding key in the database for the browser type.
-    fn field_name(&self, field_name: &CookieField) -> &'static str {
-        match (field_name, &self.typing) {
-            (CookieField::Host, DbType::Firefox) => "host",
-            (CookieField::Host, DbType::Chrome) => "host_key",
-
-            (CookieField::Name, _) => "name",
-            (CookieField::Path, _) => "path",
-            // The value field in chrome is usually empty with content
-            // instead being present in `encrypted_value`
-            (CookieField::Value, _) => "value",
-
-            (CookieField::Creation, DbType::Firefox) => "creationTime",
-            (CookieField::Creation, DbType::Chrome) => "creation_utc",
-
-            (CookieField::Expiry, DbType::Firefox) => "expiry",
-            (CookieField::Expiry, DbType::Chrome) => "expires_utc",
-
-            (CookieField::HttpOnly, DbType::Firefox) => "isHttpOnly",
-            (CookieField::HttpOnly, DbType::Chrome) => "is_http_only",
-
-            (CookieField::LastAccess, DbType::Firefox) => "lastAccessed",
-            (CookieField::LastAccess, DbType::Chrome) => "last_access_utc",
-
-            _ => panic!("Unknown `CookieField` parameter")
         }
     }
 
@@ -58,18 +36,19 @@ impl CookieDB {
     /// Load all cookies from the current `path` into the `cookies` vector
     pub fn load_cookies(&mut self) -> Result<(), rusqlite::Error> {
         let conn = rusqlite::Connection::open(&self.path)?;
+        let field_idx = if self.typing==DbType::Chrome {0} else {1};
 
         let query = format!(
             "SELECT {},{},{},{},{},{},{},{} FROM {};",
-             self.field_name(&CookieField::Host),
-             self.field_name(&CookieField::Name),
-             self.field_name(&CookieField::Value),
-             self.field_name(&CookieField::Path),
-             self.field_name(&CookieField::Creation),
-             self.field_name(&CookieField::Expiry),
-             self.field_name(&CookieField::LastAccess),
-             self.field_name(&CookieField::HttpOnly),
-             self.table_name()
+            COOKIE_FIELDS["Host"][field_idx],
+            COOKIE_FIELDS["Name"][field_idx],
+            COOKIE_FIELDS["Value"][field_idx],
+            COOKIE_FIELDS["Path"][field_idx],
+            COOKIE_FIELDS["Creation"][field_idx],
+            COOKIE_FIELDS["Expiry"][field_idx],
+            COOKIE_FIELDS["LastAccess"][field_idx],
+            COOKIE_FIELDS["HttpOnly"][field_idx],
+            self.table_name()
         );
         let mut stmt = conn.prepare(&query)?;
         let results_iter = stmt.query_map([], |row| {

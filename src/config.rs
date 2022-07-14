@@ -1,16 +1,16 @@
 use std::path::PathBuf;
 use once_cell::sync::OnceCell;
 use clap::{Parser,Subcommand};
+use phf::phf_map;
 
-// A `static` lifetime infers that a variable will be defined in
-// the RO section of a binary
-pub const DB_NAMES: &'static [&str] = &[
+//== Global constants ==//
+pub const DB_NAMES: &'static [&'static str] = &[
     "Cookies",
     "Safe Browsing Cookies",
     "cookies.sqlite"
 ];
 
-pub const SEARCH_DIRS: &'static [&str] = &[
+pub const SEARCH_DIRS: &'static [&'static str] = &[
     ".mozilla/firefox",
     ".config/chromium",
     ".config/BraveSoftware/Brave-Browser",
@@ -25,6 +25,20 @@ pub const SEARCH_DIRS: &'static [&str] = &[
     "Library/Application Support/Chromium",
     "Library/Application Support/BraveSoftware/Brave-Browser"
 ];
+
+/// A constant hash map with keys representing each valid Cookie field.
+/// Each key maps to a tuple that contains the name of the Chrome and
+/// Firefox version of the corresponding field.
+pub const COOKIE_FIELDS: phf::Map<&'static str, [&'static str; 2]> = phf_map!{
+    "Host"       => ["host_key",         "host"],
+    "Name"       => ["name",             "name"],
+    "Value"      => ["value",            "value"],
+    "Path"       => ["path",             "path"],
+    "Creation"   => ["creation_utc",     "creationTime"],
+    "Expiry"     => ["expires_utc",      "expiry"],
+    "LastAccess" => ["last_access_utc",  "lastAccessed"],
+    "HttpOnly"   => ["is_httponly",      "isHttpOnly"]
+};
 
 //=== CLI arguments ===//
 #[derive(Debug,Subcommand)]
@@ -51,7 +65,9 @@ enum SubArgs {
         #[clap(short, long, default_value = "")]
         domain: String,
 
-        /// Only include entries from a specific browser profile 
+        /// Only include entries from a specific browser profile.
+        /// The profile can be given as a partial path to differentiate
+        /// between profiles with the same name in different browsers.
         #[clap(short, long, default_value = "")]
         profile: String,
     },
