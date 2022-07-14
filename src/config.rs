@@ -43,11 +43,11 @@ enum SubArgs {
         list_fields: bool,
 
         /// Comma separated list of fields to list
-        #[clap(short, long, default_value = "Host" )]
+        #[clap(short, long, default_value = "Host,Name")]
         fields: String,
 
         /// Only include entries matching a specific domain name
-        #[clap(short, long, required = false )]
+        #[clap(short, long, default_value = "")]
         domain: String,
     },
     /// Remove cookies non-interactively

@@ -2,6 +2,7 @@
 use walkdir::WalkDir;
 use strum::IntoEnumIterator;
 use clap::{Parser,CommandFactory};
+use chrono::{TimeZone,Utc};
 use std::str::FromStr;
 
 //=== Project imports ===//
@@ -90,24 +91,37 @@ fn main() -> Result<(),()> {
             }).collect();
 
         for c in db.cookies.iter() {
-            if Config::global().domain == "" || 
+            if Config::global().domain == "" ||
              c.host.contains(&Config::global().domain) {
                 // 2. Iterate over the enums for each cookie and
                 // fetch the corresponding field value as a string
                 let values: Vec<String> = cookie_fields.iter().map(|f| {
                     match f {
-                    CookieField::Host =>       { field_fmt("Host", c.host.to_owned() ) },
-                    CookieField::Name =>       { field_fmt("Name", c.name.to_owned() ) },
-                    CookieField::Value =>      { field_fmt("Value", c.value.to_owned()) },
-                    CookieField::Path =>       { field_fmt("Path", c.path.to_owned() ) },
-
-                    CookieField::Creation =>   { field_fmt("Creation", c.creation) },
-                    CookieField::Expiry =>     { field_fmt("Expiry", c.expiry) },
-                    CookieField::LastAccess => { field_fmt("LastAccess", c.last_access) },
-
-                    CookieField::HttpOnly =>   { field_fmt("HttpOnly", c.http_only) },
-                    }
-                }).collect();
+                    CookieField::Host =>       {
+                        field_fmt("Host", c.host.to_owned() )
+                    },
+                    CookieField::Name =>       {
+                        field_fmt("Name", c.name.to_owned() )
+                    },
+                    CookieField::Value =>      {
+                        field_fmt("Value", c.value.to_owned())
+                    },
+                    CookieField::Path =>       {
+                        field_fmt("Path", c.path.to_owned() )
+                    },
+                    CookieField::Creation =>   {
+                        field_fmt("Creation", Utc.timestamp(c.creation, 0))
+                    },
+                    CookieField::Expiry =>     {
+                        field_fmt("Expiry", Utc.timestamp(c.expiry,0))
+                    },
+                    CookieField::LastAccess => {
+                        field_fmt("LastAccess", Utc.timestamp(c.last_access,0))
+                    },
+                    CookieField::HttpOnly =>   {
+                        field_fmt("HttpOnly", c.http_only)
+                    },
+                }}).collect();
 
                 println!("{}\n", values.join("\n") );
             }
