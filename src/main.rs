@@ -1,8 +1,6 @@
 use std::collections::HashSet;
-//=== Package imports ===//
 use walkdir::WalkDir;
 use clap::{Parser,CommandFactory};
-use chrono::{TimeZone,Utc};
 
 //=== Project imports ===//
 mod config;
@@ -12,7 +10,7 @@ mod types;
 mod cookie;
 mod cookie_db;
 use crate::config::{Args,Config,CONFIG,SEARCH_DIRS,DB_NAMES,COOKIE_FIELDS};
-use crate::funcs::{cookie_db_type,process_is_running,field_fmt};
+use crate::funcs::{cookie_db_type,process_is_running,cookie_to_str};
 use crate::types::{DbType,CookieDB};
 
 fn main() -> Result<(),()> {
@@ -87,46 +85,18 @@ fn main() -> Result<(),()> {
               .contains(&Config::global().profile) {
                  continue;
             }
+            // Skip profile headings if --no-heading
             if !Config::global().no_heading {
                 infoln!("{}",cookie_db.path_short(&home));
             }
-
+            // Load all fields from each cookie database
             cookie_db.load_cookies().expect("Failed to load cookies");
 
             for c in cookie_db.cookies.iter() {
+                // Skip domains if a specific --domain was passed
                 if Config::global().domain == "" ||
                  c.host.contains(&Config::global().domain) {
-                    let mut values: Vec<String> = COOKIE_FIELDS.keys().map(|f| {
-                        match *f {
-                        "Host" =>       {
-                            field_fmt("Host", c.host.to_owned() )
-                        },
-                        "Name" =>       {
-                            field_fmt("Name", c.name.to_owned() )
-                        },
-                        "Value" =>      {
-                            field_fmt("Value", c.value.to_owned())
-                        },
-                        "Path" =>       {
-                            field_fmt("Path", c.path.to_owned() )
-                        },
-                        "Creation" =>   {
-                            field_fmt("Creation", Utc.timestamp(c.creation, 0))
-                        },
-                        "Expiry" =>     {
-                            field_fmt("Expiry", Utc.timestamp(c.expiry,0))
-                        },
-                        "LastAccess" => {
-                            field_fmt("LastAccess", Utc.timestamp(c.last_access,0))
-                        },
-                        "HttpOnly" =>   {
-                            field_fmt("HttpOnly", c.http_only)
-                        },
-                        _ => panic!("Unknown cookie field")
-                    }}).collect();
-
-                    values.sort();
-                    println!("{}\n", values.join("\n") );
+                    println!("{}\n", cookie_to_str(&c));
                 }
              }
         }

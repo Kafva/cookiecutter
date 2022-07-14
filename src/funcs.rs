@@ -3,10 +3,12 @@ use std::io;
 use std::fs::File;
 use std::path::Path;
 use std::fmt;
-use sysinfo::{System, SystemExt, RefreshKind};
 
-use crate::types::DbType;
-use crate::Config;
+use sysinfo::{System, SystemExt, RefreshKind};
+use chrono::{TimeZone,Utc};
+
+use crate::types::{DbType,Cookie};
+use crate::{Config,COOKIE_FIELDS};
 
 /// Check if a process is running using the `sysinfo` library
 pub fn process_is_running(name: &str) -> bool {
@@ -24,6 +26,59 @@ pub fn process_is_running(name: &str) -> bool {
     found
 }
 
+/// Construct a newline separated string with the field names
+/// and values of a provided cookie (limited to the fields specified
+/// in --fields)
+pub fn cookie_to_str(cookie: &Cookie) -> String {
+    let mut values: Vec<String> = COOKIE_FIELDS.keys().map(|f| {
+        // Skip fields not listed in the --fields option
+        if !Config::global().fields.split(",").any(|s| {s==*f} ) {
+           String::from("")
+        } else {
+            match *f {
+            "Host" =>       {
+                field_fmt("Host", cookie.host.to_owned() )
+            },
+            "Name" =>       {
+                field_fmt("Name", cookie.name.to_owned() )
+            },
+            "Value" =>      {
+                field_fmt("Value", cookie.value.to_owned())
+            },
+            "Path" =>       {
+                field_fmt("Path", cookie.path.to_owned() )
+            },
+            "Creation" =>   {
+                field_fmt("Creation", Utc.timestamp(cookie.creation, 0))
+            },
+            "Expiry" =>     {
+                field_fmt("Expiry", Utc.timestamp(cookie.expiry,0))
+            },
+            "LastAccess" => {
+                field_fmt("LastAccess", Utc.timestamp(cookie.last_access,0))
+            },
+            "HttpOnly" =>   {
+                field_fmt("HttpOnly", cookie.http_only)
+            },
+            "Secure" =>   {
+                field_fmt("Secure", cookie.secure)
+            },
+            "SameSite" =>   {
+                let samesite = match cookie.samesite {
+                    2 => "Strict",
+                    1 => "Lax",
+                    0 => "None",
+                    _ => panic!("Unknown SameSite type")
+                };
+                field_fmt("SameSite", samesite)
+            },
+            _ => panic!("Unknown cookie field")
+            }
+        }}).filter(|f| f != "" ).collect();
+    values.sort();
+    values.join("\n")
+}
+
 fn is_db_with_table(conn: &rusqlite::Connection, table_name: &str) -> bool {
     return conn.query_row::<u32,_,_>(
         &format!("SELECT 1 FROM {table_name} LIMIT 1"),
@@ -33,7 +88,7 @@ fn is_db_with_table(conn: &rusqlite::Connection, table_name: &str) -> bool {
 }
 
 /// The output format of cookie fields listed with the `cookies` option
-pub fn field_fmt<T: fmt::Display>(name: &'static str, value: T) -> String {
+fn field_fmt<T: fmt::Display>(name: &'static str, value: T) -> String {
     if Config::global().nocolor {
         format!("{}: {}", name, value)
     } else {

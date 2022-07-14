@@ -3,7 +3,7 @@ use crate::types::{DbType,CookieDB,Cookie};
 
 impl CookieDB {
     /// Replace the given `home` string with "~"
-    pub fn path_short(&self,home: &str) -> String {
+    pub fn path_short(&self, home: &str) -> String {
         self.path.parent().unwrap()
             .to_string_lossy().replace(home,"~")
     }
@@ -39,7 +39,7 @@ impl CookieDB {
         let field_idx = if self.typing==DbType::Chrome {0} else {1};
 
         let query = format!(
-            "SELECT {},{},{},{},{},{},{},{} FROM {};",
+            "SELECT {},{},{},{},{},{},{},{},{},{} FROM {};",
             COOKIE_FIELDS["Host"][field_idx],
             COOKIE_FIELDS["Name"][field_idx],
             COOKIE_FIELDS["Value"][field_idx],
@@ -48,6 +48,8 @@ impl CookieDB {
             COOKIE_FIELDS["Expiry"][field_idx],
             COOKIE_FIELDS["LastAccess"][field_idx],
             COOKIE_FIELDS["HttpOnly"][field_idx],
+            COOKIE_FIELDS["Secure"][field_idx],
+            COOKIE_FIELDS["SameSite"][field_idx],
             self.table_name()
         );
         let mut stmt = conn.prepare(&query)?;
@@ -69,7 +71,9 @@ impl CookieDB {
                     last_access: self.get_unix_epoch(
                         row.get::<_,i64>(6)?
                     ),
-                    http_only: row.get::<_,bool>(7)?
+                    http_only: row.get::<_,bool>(7)?,
+                    secure: row.get::<_,bool>(8)?,
+                    samesite: row.get::<_,i32>(9)?
                 }
             )
         })?;

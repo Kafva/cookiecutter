@@ -37,7 +37,9 @@ pub const COOKIE_FIELDS: phf::Map<&'static str, [&'static str; 2]> = phf_map!{
     "Creation"   => ["creation_utc",     "creationTime"],
     "Expiry"     => ["expires_utc",      "expiry"],
     "LastAccess" => ["last_access_utc",  "lastAccessed"],
-    "HttpOnly"   => ["is_httponly",      "isHttpOnly"]
+    "HttpOnly"   => ["is_httponly",      "isHttpOnly"],
+    "Secure"     => ["is_secure",        "isSecure"],
+    "SameSite"   => ["samesite",         "sameSite"],
 };
 
 //=== CLI arguments ===//
