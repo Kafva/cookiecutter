@@ -2,9 +2,11 @@ use std::io::Read; // Enables the use of .read_exact()
 use std::io;
 use std::fs::File;
 use std::path::Path;
+use std::fmt;
 use sysinfo::{System, SystemExt, RefreshKind};
 
 use crate::types::DbType;
+use crate::Config;
 
 /// Check if a process is running using the `sysinfo` library
 pub fn process_is_running(name: &str) -> bool {
@@ -28,6 +30,15 @@ fn is_db_with_table(conn: &rusqlite::Connection, table_name: &str) -> bool {
         [],
         |row|row.get(0)
     ).is_ok();
+}
+
+/// The output format of cookie fields listed with the `cookies` option
+pub fn field_fmt<T: fmt::Display>(name: &'static str, value: T) -> String {
+    if Config::global().nocolor {
+        format!("{}: {}", name, value)
+    } else {
+        format!("\x1b[97;1m{}:\x1b[0m {}", name, value)
+    }
 }
 
 /// Finds all SQLite databases under the given path

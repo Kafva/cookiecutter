@@ -12,7 +12,7 @@ mod types;
 mod cookie;
 mod cookie_db;
 use crate::config::{Args,Config,CONFIG,SEARCH_DIRS,DB_NAMES};
-use crate::funcs::{cookie_db_type,process_is_running};
+use crate::funcs::{cookie_db_type,process_is_running,field_fmt};
 use crate::types::{DbType,CookieDB,CookieField};
 
 fn main() -> Result<(),()> {
@@ -20,6 +20,7 @@ fn main() -> Result<(),()> {
     let args: Args = Args::parse();
     let cfg = Config::from_args(args);
     CONFIG.set(cfg).unwrap();
+    if Config::global().debug { eprintln!("{:#?}", Config::global()); }
 
     // Verify that Firefox is not running since it locks the database
     if process_is_running("firefox") {
@@ -83,26 +84,28 @@ fn main() -> Result<(),()> {
 
         // 1. Split the fields string and convert each string
         // into a CookieField enum
-        let cookie_fields: Vec<CookieField> = Config::global().fields.split(",").map(|f| {
-           CookieField::from_str(f).expect("Invalid cookie field name")
-        }).collect();
+        let cookie_fields: Vec<CookieField> = Config::global().fields.split(",")
+            .map(|f| {
+                CookieField::from_str(f).expect("Invalid cookie field name")
+            }).collect();
 
         for c in db.cookies.iter() {
-            if Config::global().domain == "" || c.host.contains(&Config::global().domain) {
+            if Config::global().domain == "" || 
+             c.host.contains(&Config::global().domain) {
                 // 2. Iterate over the enums for each cookie and
                 // fetch the corresponding field value as a string
                 let values: Vec<String> = cookie_fields.iter().map(|f| {
                     match f {
-                        CookieField::Host =>  { format!("host: {}", c.host.to_owned() ) },
-                        CookieField::Name =>  { format!("name: {}", c.name.to_owned() ) },
-                        CookieField::Value => { format!("value: {}", c.value.to_owned()) },
-                        CookieField::Path =>  { format!("path: {}", c.path.to_owned() ) },
+                    CookieField::Host =>       { field_fmt("Host", c.host.to_owned() ) },
+                    CookieField::Name =>       { field_fmt("Name", c.name.to_owned() ) },
+                    CookieField::Value =>      { field_fmt("Value", c.value.to_owned()) },
+                    CookieField::Path =>       { field_fmt("Path", c.path.to_owned() ) },
 
-                        CookieField::Creation => { format!("creation: {}", c.creation) },
-                        CookieField::Expiry => { format!("expiry: {}", c.expiry) },
-                        CookieField::LastAccess => { format!("last_access: {}", c.last_access) },
+                    CookieField::Creation =>   { field_fmt("Creation", c.creation) },
+                    CookieField::Expiry =>     { field_fmt("Expiry", c.expiry) },
+                    CookieField::LastAccess => { field_fmt("LastAccess", c.last_access) },
 
-                        CookieField::HttpOnly => { format!("http_only: {}", c.http_only) },
+                    CookieField::HttpOnly =>   { field_fmt("HttpOnly", c.http_only) },
                     }
                 }).collect();
 

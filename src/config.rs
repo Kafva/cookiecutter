@@ -55,6 +55,10 @@ enum SubArgs {
         /// Keep cookies from specified domains
         #[clap(short, long, required = false)]
         whitelist: PathBuf,
+    },
+    /// Open a TUI were cookies across all installed browsers can be viewed
+    /// and manipulated
+    Tui {
     }
 }
 
@@ -67,10 +71,9 @@ pub struct Args {
     #[clap(short, long)]
     debug: bool,
 
-    /// Open a TUI were cookies across all installed browsers can be viewed
-    /// and manipulated
-    #[clap(short, long)]
-    tui: bool,
+    /// Disable colored output (not applicable for TUI mode)
+    #[clap(long)]
+    nocolor: bool,
 
     #[clap(subcommand)]
     subargs: Option<SubArgs>
@@ -87,7 +90,9 @@ pub struct Config {
     pub fields: String,
     pub dbs: bool,
     pub list_fields: bool,
-    pub domain: String
+    pub domain: String,
+    pub nocolor: bool,
+    pub tui: bool
 }
 
 impl Default for Config {
@@ -100,7 +105,9 @@ impl Default for Config {
             fields: String::from(""),
             dbs: false,
             list_fields: false,
-            domain: String::from("")
+            domain: String::from(""),
+            nocolor: false,
+            tui: false
         }
     }
 }
@@ -109,6 +116,9 @@ impl Config {
     /// Initialise a new config object from an Args struct
     pub fn from_args(args: Args) -> Self {
         let mut cfg = Config::default();
+        cfg.nocolor = args.nocolor;
+        cfg.debug   = args.debug;
+
         match args.subargs {
             Some(SubArgs::Dbs {  }) => {
                 cfg.dbs = true; cfg
@@ -124,7 +134,8 @@ impl Config {
             Some(SubArgs::Clean { whitelist }) => {
                 cfg.whitelist = whitelist.to_path_buf(); cfg
             }
-            _ => panic!("Unknown argument")
+            Some(SubArgs::Tui {  }) => { cfg }
+            None => { cfg }
         }
     }
     /// Used to access the global config object in the program

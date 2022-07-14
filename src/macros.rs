@@ -1,8 +1,19 @@
 #[macro_export]
+macro_rules! msg_prefix {
+    ( $x:literal ) => (
+        if Config::global().nocolor {
+            eprint!("!> ");
+        } else {
+            eprint!("{}",format!("\x1b[{}m!>\x1b[0m ", $x));
+        }
+    )
+}
+
+#[macro_export]
 macro_rules! errln {
     // Match one or more expressions to this arm
     ( $($x:expr),* ) => (
-        eprint!("\x1b[91m!>\x1b[0m ");
+        msg_prefix!("91");
         eprintln!($($x)*);
     )
 }
@@ -10,13 +21,13 @@ macro_rules! errln {
 macro_rules! infoln {
     // Match a fmt literal + one or more expressions
     ( $fmt:literal, $($x:expr),* ) => (
-        print!("\x1b[94m!>\x1b[0m ");
-        println!($fmt, $($x)*);
+        msg_prefix!("94");
+        eprintln!($fmt, $($x)*);
     );
     // Match one or more expressions without a literal
     ( $($x:expr),* ) => (
-        print!("\x1b[94m!>\x1b[0m ");
-        println!($($x)*);
+        msg_prefix!("94");
+        eprintln!($($x)*);
     )
 }
 #[macro_export]
@@ -24,15 +35,15 @@ macro_rules! debugln {
     // Match a fmt literal + one or more expressions
     ( $fmt:literal, $($x:expr),* ) => (
         if Config::global().debug {
-            print!("\x1b[94m!>\x1b[0m ");
-            println!($fmt, $($x)*);
+            msg_prefix!("94");
+            eprintln!($fmt, $($x)*);
         }
     );
     // Match one or more expressions without a literal
     ( $($x:expr),* ) => (
         if Config::global().debug {
-            print!("\x1b[94m!>\x1b[0m ");
-            println!($($x)*);
+            msg_prefix!("94");
+            eprintln!($($x)*);
         }
     )
 }
