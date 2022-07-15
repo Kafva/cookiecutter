@@ -51,11 +51,11 @@ enum SubArgs {
         #[clap(short, long, takes_value = false)]
         no_heading: bool,
 
-        /// List valid fields
+        /// List valid fields for the --fields option
         #[clap(long, takes_value = false)]
         list_fields: bool,
 
-        /// List valid browser profiles
+        /// List valid browser profiles for the --profile option
         #[clap(long, takes_value = false)]
         list_profiles: bool,
 
@@ -64,13 +64,13 @@ enum SubArgs {
         fields: String,
 
         /// Only include entries matching a specific domain name
-        #[clap(short, long, default_value = "")]
+        #[clap(short, long, default_value_t)]
         domain: String,
 
         /// Only include entries from a specific browser profile.
         /// The profile can be given as a partial path to differentiate
         /// between profiles with the same name in different browsers.
-        #[clap(short, long, default_value = "")]
+        #[clap(short, long, default_value_t)]
         profile: String,
     },
     /// Remove cookies non-interactively
@@ -89,6 +89,7 @@ enum SubArgs {
 #[derive(Parser, Debug)]
 #[clap(version = "1.0", author = "Kafva <https://github.com/Kafva>",
   about = "Cookie manager")]
+/// https://github.com/clap-rs/clap/blob/v3.2.7/examples/derive_ref/README.md#arg-attributes
 pub struct Args {
     /// Debug mode
     #[clap(short, long)]
