@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use once_cell::sync::OnceCell;
 use clap::{Parser,Subcommand};
 use phf::phf_map;
@@ -78,8 +77,8 @@ enum SubArgs {
     /// Remove cookies non-interactively
     Clean {
         /// Keep cookies from specified domains
-        #[clap(short, long, required = false)]
-        whitelist: PathBuf,
+        #[clap(short, long, default_value_t)]
+        whitelist: String
     },
     /// Open a TUI were cookies across all installed browsers can be viewed
     /// and manipulated
@@ -115,17 +114,25 @@ pub struct Args {
 #[derive(Debug)]
 pub struct Config {
     pub err_exit: i32,
+
     pub debug: bool,
-    pub whitelist: PathBuf,
-    pub no_heading: bool,
+    pub file: String,
+    pub nocolor: bool,
+
+    // Subcmd: cookies
     pub fields: String,
+    pub no_heading: bool,
     pub list_profiles: bool,
     pub list_fields: bool,
     pub domain: String,
-    pub nocolor: bool,
-    pub tui: bool,
     pub profile: String,
-    pub file: String
+
+    // Subcmd: clean
+    pub clean: bool,
+    pub whitelist: String,
+
+    // Subcmd: tui
+    pub tui: bool,
 }
 
 impl Default for Config {
@@ -133,7 +140,7 @@ impl Default for Config {
         Config {
             err_exit: 1,
             debug: false,
-            whitelist: PathBuf::default(),
+            whitelist: String::from(""),
             no_heading: false,
             fields: String::from(""),
             list_profiles: false,
@@ -142,7 +149,8 @@ impl Default for Config {
             nocolor: false,
             tui: false,
             profile: String::from(""),
-            file: String::from("")
+            file: String::from(""),
+            clean: false
         }
     }
 }
@@ -167,7 +175,8 @@ impl Config {
                 cfg.fields = fields; cfg
             }
             Some(SubArgs::Clean { whitelist }) => {
-                cfg.whitelist = whitelist.to_path_buf(); cfg
+                cfg.clean = true;
+                cfg.whitelist = whitelist; cfg
             }
             Some(SubArgs::Tui {  }) => { cfg }
             None => { cfg }

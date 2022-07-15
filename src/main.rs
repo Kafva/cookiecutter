@@ -85,6 +85,13 @@ fn main() -> Result<(),()> {
                 }
              }
         }
+    } 
+    //== Subcmd: clean ==//
+    else if Config::global().clean {
+        for cookie_db in cookie_dbs {
+            infoln!("Cleaning {}", cookie_db.path_short());
+        }
+
     } else {
        let mut args_cmd = Args::command();
        args_cmd.print_help().unwrap();
