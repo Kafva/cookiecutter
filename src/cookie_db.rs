@@ -1,6 +1,9 @@
 use crypto::pbkdf2::pbkdf2;
 use crypto::hmac::Hmac;
 use crypto::sha1::Sha1;
+use crypto::{ symmetriccipher, buffer, aes, blockmodes };
+use crypto::buffer::{ ReadBuffer, WriteBuffer, BufferResult };
+
 use crate::config::COOKIE_FIELDS;
 use crate::types::{DbType,CookieDB,Cookie};
 use crate::funcs::get_home;
@@ -42,6 +45,36 @@ impl CookieDB {
         }
     }
 
+    /// Decrypt a cookie's `encrypted_value` field using a provided key
+    fn decrypt_value(&self, enc_value: &[u8], key: &[u8], iv: &[u8]) 
+     -> Result<Vec<u8>, symmetriccipher::SymmetricCipherError> {
+        let mut decryptor = aes::cbc_decryptor(
+            aes::KeySize::KeySize256,
+            key,
+            iv,
+            blockmodes::PkcsPadding
+        );
+        let mut final_result = Vec::<u8>::new();
+        let mut read_buffer = buffer::RefReadBuffer::new(enc_value);
+        let mut buffer = [0; 4096];
+        let mut write_buffer = buffer::RefWriteBuffer::new(&mut buffer);
+
+        loop {
+            let result = decryptor.decrypt(
+                &mut read_buffer, &mut write_buffer, true
+            )?;
+            final_result.extend(
+                write_buffer.take_read_buffer().take_remaining()
+                .iter().map(|&i| i)
+            );
+            match result {
+                BufferResult::BufferUnderflow => break,
+                BufferResult::BufferOverflow => { }
+            }
+        }
+        Ok(final_result)
+    }
+
     /// Attempt to decrypt and load values from the `encrypted_value` column
     /// of a Chrome database.
     /// Adapted from:
@@ -51,13 +84,25 @@ impl CookieDB {
         "macos"  => {
             let password = "peanuts";
             let salt = "saltysalt";
-            let rounds = 16;
+            let key_length = 16;
             let mut mac = Hmac::new(Sha1::new(), password.as_bytes());
             let mut derived_key: [u8;16] = [0;16];
 
-            pbkdf2(&mut mac, salt.as_bytes(), rounds, &mut derived_key);
+            pbkdf2(&mut mac, salt.as_bytes(), key_length, &mut derived_key);
 
-            println!("KEY: {:#?}", derived_key)
+            let iv: [u8; 17] = [0; 17];
+            // Note that the first 3 bytes should be skipped
+            let cipher = &self.cookies[0].encrypted_value[3..];
+
+            println!("c: {:#?} {}", cipher, cipher.len());
+
+            let plaintext = self.decrypt_value(
+                &cipher, 
+                &derived_key, 
+                &iv
+            ).unwrap();
+
+            println!("p: {:#?}", plaintext);
         },
         //"macos"  => {
         //},
