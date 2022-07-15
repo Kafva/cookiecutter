@@ -1,5 +1,6 @@
 use std::collections::HashSet;
-use walkdir::WalkDir;
+use std::path;
+
 use clap::{Parser,CommandFactory};
 
 //=== Project imports ===//
@@ -9,9 +10,9 @@ mod macros;
 mod types;
 mod cookie;
 mod cookie_db;
-use crate::config::{Args,Config,CONFIG,SEARCH_DIRS,DB_NAMES,COOKIE_FIELDS};
-use crate::funcs::{cookie_db_type,process_is_running};
-use crate::types::{DbType,CookieDB};
+use crate::config::{Args,Config,CONFIG,COOKIE_FIELDS};
+use crate::funcs::{cookie_db_type,process_is_running,cookie_dbs_from_profiles};
+use crate::types::CookieDB;
 
 fn main() -> Result<(),()> {
     // Load command line configuration arguments into a global
@@ -26,41 +27,23 @@ fn main() -> Result<(),()> {
         std::process::exit(Config::global().err_exit);
     }
 
-    // WSL support
-    let home: String = if std::fs::metadata("/mnt/c/Users").is_ok() {
-        format!("/mnt/c/Users/{}", std::env::var("USER").unwrap())
-    } else {
-        std::env::var("HOME").unwrap()
-    };
-
     let mut cookie_dbs: HashSet<CookieDB> = HashSet::new();
 
-    for search_dir in SEARCH_DIRS {
-        // 'home' needs to be cloned since it is referenced in each iteration
-        let search_path: String = format!("{}/{}", home.to_owned(), search_dir);
-
-        // We pass a reference of `search_path` since
-        // we want to retain ownership of the variable for later use
-        for entry in WalkDir::new(&search_path).follow_links(false)
-           .into_iter().filter_map(|e| e.ok()) {
-            // The filter is used to skip inaccessible paths
-            if entry.file_type().is_file() &&
-             DB_NAMES.contains(&entry.file_name().to_string_lossy().as_ref()) {
-                let db_type = cookie_db_type(&(entry.path()))
-                    .unwrap_or_else(|_| {
-                        return DbType::Unknown;
-                    });
-                if ! matches!(db_type, DbType::Unknown) {
-                    cookie_dbs.insert( CookieDB {
-                        path: entry.into_path().to_owned(),
-                        typing: db_type,
-                        cookies: vec![]
-                    });
-                }
-            }
-        }
+    // Parse a custom db if a --file was provided
+    if Config::global().file != "" {
+        let custom_db_path = path::PathBuf::try_from(&Config::global().file)
+                .expect("Could not create PathBuf from provided --file");
+        let typing = cookie_db_type(&custom_db_path.as_path())
+                .expect("Failed to determine database type of --file argument");
+        cookie_dbs.insert( CookieDB {
+            path:  custom_db_path,
+            typing,
+            cookies: vec![]
+        });
+    } else {
+        // Fetch a set of all cookie dbs on the system
+        cookie_dbs_from_profiles(&mut cookie_dbs);
     }
-
     let mut cookie_dbs = Vec::from_iter(cookie_dbs);
     cookie_dbs.sort();
 
@@ -74,7 +57,7 @@ fn main() -> Result<(),()> {
     else if Config::global().list_profiles {
         infoln!("Profiles with a cookie database:");
         cookie_dbs.iter().for_each(|c| {
-            println!("  {}", c.path_short(&home));
+            println!("  {}", c.path_short());
         });
     }
     else if Config::global().fields != "" && cookie_dbs.len() > 0 {
@@ -87,7 +70,7 @@ fn main() -> Result<(),()> {
             }
             // Skip profile headings if --no-heading
             if !Config::global().no_heading {
-                infoln!("{}",cookie_db.path_short(&home));
+                infoln!("{}",cookie_db.path_short());
             }
             // Load all fields from each cookie database
             cookie_db.load_cookies().expect("Failed to load cookies");

@@ -98,6 +98,11 @@ pub struct Args {
     #[clap(long)]
     nocolor: bool,
 
+    /// Perform all commands on a supplied cookie database
+    /// (overrides --profile)
+    #[clap(long,short)]
+    file: String,
+
     #[clap(subcommand)]
     subargs: Option<SubArgs>
 }
@@ -116,7 +121,8 @@ pub struct Config {
     pub domain: String,
     pub nocolor: bool,
     pub tui: bool,
-    pub profile: String
+    pub profile: String,
+    pub file: String
 }
 
 impl Default for Config {
@@ -132,7 +138,8 @@ impl Default for Config {
             domain: String::from(""),
             nocolor: false,
             tui: false,
-            profile: String::from("")
+            profile: String::from(""),
+            file: String::from("")
         }
     }
 }
@@ -143,6 +150,7 @@ impl Config {
         let mut cfg = Config::default();
         cfg.nocolor = args.nocolor;
         cfg.debug   = args.debug;
+        cfg.file    = args.file;
 
         match args.subargs {
             Some(SubArgs::Cookies {

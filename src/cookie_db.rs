@@ -1,11 +1,17 @@
 use crate::config::COOKIE_FIELDS;
 use crate::types::{DbType,CookieDB,Cookie};
+use crate::funcs::get_home;
 
 impl CookieDB {
-    /// Replace the given `home` string with "~"
-    pub fn path_short(&self, home: &str) -> String {
-        self.path.parent().unwrap()
-            .to_string_lossy().replace(home,"~")
+    /// Return the parent of the current path and replaces $HOME with "~".
+    /// Returns `path` as is if it is not an absolute path.
+    pub fn path_short(&self) -> String {
+        if self.path.has_root() {
+            self.path.parent().unwrap().to_string_lossy()
+                .replace(&get_home(),"~")
+        } else {
+            self.path.to_string_lossy().to_string()
+        }
     }
 
     /// Fetch the name of the cookies table depending on
@@ -86,4 +92,31 @@ impl CookieDB {
         Ok(())
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use crate::path::PathBuf;
+    use crate::types::{DbType,CookieDB};
+    use crate::funcs::get_home;
+
+    #[test]
+    fn test_path_short() {
+        let mut cdb = CookieDB { 
+            path: PathBuf::from("./cookies.sqlite"), 
+            typing: DbType::Chrome, 
+            cookies: vec![] 
+        };
+        assert_eq!(cdb.path_short(), "./cookies.sqlite");
+
+        cdb.path = PathBuf::from("../../var/Cookies");
+        assert_eq!(cdb.path_short(), "../../var/Cookies");
+
+        cdb.path = PathBuf::from(
+            format!("{}/.config/chromium/Default/Cookies", get_home())
+        );
+        assert_eq!(cdb.path_short(), "~/.config/chromium/Default");
+    }
+}
+
 
