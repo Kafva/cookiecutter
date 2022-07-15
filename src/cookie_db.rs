@@ -1,6 +1,7 @@
-use crate::config::COOKIE_FIELDS;
+use crate::config::{COOKIE_FIELDS,Config};
 use crate::types::{DbType,CookieDB,Cookie};
 use crate::funcs::get_home;
+use crate::{debugln,msg_prefix};
 
 impl CookieDB {
     /// Return the parent of the current path and replaces $HOME with "~".
@@ -102,6 +103,28 @@ impl CookieDB {
 
         stmt.finalize().unwrap();
         conn.close().unwrap();
+        Ok(())
+    }
+
+    pub fn clean(&self, whitelist: &Vec<String>, apply: bool)
+     -> Result<(), rusqlite::Error> {
+        let field_idx = if self.typing==DbType::Chrome {0} else {1};
+
+        let query = format!(
+            "DELETE FROM {} WHERE {} NOT IN ({});",
+            self.table_name(),
+            COOKIE_FIELDS["Host"][field_idx],
+            whitelist.join(",")
+        );
+
+        if apply {
+            let conn = rusqlite::Connection::open(&self.path)?;
+            debugln!("{}", query);
+            conn.execute(&query, rusqlite::params![])?;
+            conn.close().unwrap();
+        } else {
+            println!("!> {query}");
+        }
         Ok(())
     }
 }

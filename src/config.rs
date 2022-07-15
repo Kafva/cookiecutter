@@ -56,10 +56,6 @@ enum SubArgs {
         #[clap(long, takes_value = false)]
         list_fields: bool,
 
-        /// List valid browser profiles for the --profile option
-        #[clap(long, takes_value = false)]
-        list_profiles: bool,
-
         /// Comma separated list of fields to list
         #[clap(short, long, default_value = "Host,Name")]
         fields: String,
@@ -68,17 +64,16 @@ enum SubArgs {
         #[clap(short, long, default_value_t)]
         domain: String,
 
-        /// Only include entries from a specific browser profile.
-        /// The profile can be given as a partial path to differentiate
-        /// between profiles with the same name in different browsers.
-        #[clap(short, long, default_value_t)]
-        profile: String,
     },
     /// Remove cookies non-interactively
     Clean {
         /// Keep cookies from specified domains
         #[clap(short, long, default_value_t)]
-        whitelist: String
+        whitelist: String,
+
+        /// Apply changes
+        #[clap(short, long)]
+        apply: bool
     },
     /// Open a TUI were cookies across all installed browsers can be viewed
     /// and manipulated
@@ -100,6 +95,17 @@ pub struct Args {
     #[clap(long)]
     nocolor: bool,
 
+    /// Only include entries from a specific browser profile.
+    /// Any unique part of the path to profile can be used as an identifier
+    /// e.g. `-p Brave` can be resolved to
+    /// `~/.config/BraveSoftware/Brave-Browser/Default`
+    #[clap(short, long, default_value_t)]
+    profile: String,
+
+    /// List valid browser profiles for the --profile option
+    #[clap(long, takes_value = false)]
+    list_profiles: bool,
+
     /// Perform all commands on a supplied cookie database
     /// (overrides --profile)
     #[clap(long, short, default_value_t)]
@@ -118,6 +124,7 @@ pub struct Config {
     pub debug: bool,
     pub file: String,
     pub nocolor: bool,
+    pub profile: String,
 
     // Subcmd: cookies
     pub fields: String,
@@ -125,11 +132,11 @@ pub struct Config {
     pub list_profiles: bool,
     pub list_fields: bool,
     pub domain: String,
-    pub profile: String,
 
     // Subcmd: clean
     pub clean: bool,
     pub whitelist: String,
+    pub apply: bool,
 
     // Subcmd: tui
     pub tui: bool,
@@ -150,7 +157,8 @@ impl Default for Config {
             tui: false,
             profile: String::from(""),
             file: String::from(""),
-            clean: false
+            clean: false,
+            apply: false
         }
     }
 }
@@ -158,24 +166,25 @@ impl Default for Config {
 impl Config {
     /// Initialise a new config object from an Args struct
     pub fn from_args(args: Args) -> Self {
-        let mut cfg = Config::default();
-        cfg.nocolor = args.nocolor;
-        cfg.debug   = args.debug;
-        cfg.file    = args.file;
+        let mut cfg       = Config::default();
+        cfg.nocolor       = args.nocolor;
+        cfg.debug         = args.debug;
+        cfg.file          = args.file;
+        cfg.profile       = args.profile;
+        cfg.list_profiles = args.list_profiles;
 
         match args.subargs {
             Some(SubArgs::Cookies {
-                no_heading, list_fields, fields, domain, list_profiles, profile
+                no_heading, list_fields, fields, domain
             }) => {
                 cfg.no_heading = no_heading;
                 cfg.list_fields = list_fields;
                 cfg.domain = domain;
-                cfg.list_profiles = list_profiles;
-                cfg.profile = profile;
                 cfg.fields = fields; cfg
             }
-            Some(SubArgs::Clean { whitelist }) => {
+            Some(SubArgs::Clean { whitelist, apply }) => {
                 cfg.clean = true;
+                cfg.apply = apply;
                 cfg.whitelist = whitelist; cfg
             }
             Some(SubArgs::Tui {  }) => { cfg }

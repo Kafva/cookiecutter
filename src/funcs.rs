@@ -1,4 +1,4 @@
-use std::io::Read; // Enables the use of .read_exact()
+use std::io::{Read,BufRead}; // Enables the use of .read_exact()
 use std::io;
 use std::fs::File;
 use std::path::Path;
@@ -10,7 +10,7 @@ use sysinfo::{System, SystemExt, RefreshKind};
 use crate::types::{DbType,CookieDB};
 use crate::config::{SEARCH_DIRS,DB_NAMES};
 
-/// Returns /mnt/c/Users/$USER under WSL, otherwise the value of $HOME 
+/// Returns /mnt/c/Users/$USER under WSL, otherwise the value of $HOME
 pub fn get_home() -> String {
     if std::fs::metadata("/mnt/c/Users").is_ok() {
         format!("/mnt/c/Users/{}", std::env::var("USER").unwrap())
@@ -105,6 +105,29 @@ pub fn cookie_db_type(filepath:&Path) -> Result<DbType,io::Error> {
     }
 
     return Ok(DbType::Unknown);
+}
+
+/// Parse the domains from a newline separated whitelist into a vector,
+/// skipping lines that start with '#'. Each entry will have explicit
+/// quotes surrounding it.
+pub fn parse_whitelist(filepath: &Path) -> Result<Vec<String>,io::Error> {
+    let f = File::open(filepath)?;
+    let mut reader = io::BufReader::new(f);
+
+    let mut whitelist = vec![];
+    let mut line: String = "".to_string();
+    while reader.read_line(&mut line)? > 0 {
+       // Skip comments
+       let trimmed_line = line.trim();
+       if !trimmed_line.starts_with("#") && trimmed_line.len() > 0 {
+           // Insert explicit qoutes
+           whitelist.push(
+               format!("\"{trimmed_line}\"")
+           );
+       }
+       line = "".to_string();
+    }
+    Ok(whitelist)
 }
 
 #[cfg(test)]

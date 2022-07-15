@@ -11,7 +11,12 @@ macro_rules! msg_prefix {
 
 #[macro_export]
 macro_rules! errln {
-    // Match one or more expressions to this arm
+    // Match a fmt literal + one or more expressions
+    ( $fmt:literal, $($x:expr),* ) => (
+        msg_prefix!("91");
+        eprintln!($fmt, $($x)*);
+    );
+    // Match one or more expressions
     ( $($x:expr),* ) => (
         msg_prefix!("91");
         eprintln!($($x)*);

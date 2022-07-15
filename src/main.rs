@@ -11,7 +11,7 @@ mod types;
 mod cookie;
 mod cookie_db;
 use crate::config::{Args,Config,CONFIG,COOKIE_FIELDS};
-use crate::funcs::{cookie_db_type,process_is_running,cookie_dbs_from_profiles};
+use crate::funcs::{cookie_db_type,process_is_running,cookie_dbs_from_profiles,parse_whitelist};
 use crate::types::CookieDB;
 
 fn main() -> Result<(),()> {
@@ -47,20 +47,34 @@ fn main() -> Result<(),()> {
     let mut cookie_dbs = Vec::from_iter(cookie_dbs);
     cookie_dbs.sort();
 
-    //== Subcmd: cookies ==//
-    if Config::global().list_fields {
-        infoln!("Valid fields:");
-        for field_name in COOKIE_FIELDS.keys() {
-            println!("  {:?}", field_name);
-        }
+
+    // Explicitly note if an invalid --profile was specified
+    if Config::global().profile != "" &&
+     !cookie_dbs.iter().any(|c|
+      c.path.to_string_lossy().to_owned()
+        .contains(&Config::global().profile)
+    ) {
+        errln!("No profile matching '{}' found", Config::global().profile);
+        std::process::exit(Config::global().err_exit);
     }
-    else if Config::global().list_profiles {
+
+
+    if Config::global().list_profiles {
         infoln!("Profiles with a cookie database:");
         cookie_dbs.iter().for_each(|c| {
             println!("  {}", c.path_short());
         });
     }
+    //== Subcmd: cookies ==//
+    else if Config::global().list_fields {
+        infoln!("Valid fields:");
+        for field_name in COOKIE_FIELDS.keys() {
+            println!("  {:?}", field_name);
+        }
+    }
     else if Config::global().fields != "" && cookie_dbs.len() > 0 {
+        let multiple_fields = Config::global().fields.find(",").is_some();
+
         for mut cookie_db in cookie_dbs {
             // Skip profiles if a specific --profile was passed
             if Config::global().profile != "" &&
@@ -74,22 +88,45 @@ fn main() -> Result<(),()> {
             }
             // Load all fields from each cookie database
             cookie_db.load_cookies().expect("Failed to load cookies");
+            let mut output_str = String::new();
 
             for c in cookie_db.cookies.iter() {
                 // Skip domains if a specific --domain was passed
                 if Config::global().domain == "" ||
                  c.host.contains(&Config::global().domain) {
-                    println!("{}\n",
-                        c.fields_as_str(&Config::global().fields)
-                    );
+
+                    output_str = output_str +
+                        &c.fields_as_str(&Config::global().fields) + "\n";
+
+                    if multiple_fields {
+                        // Skip blankline for single entries
+                        output_str = output_str + "\n"
+                    }
                 }
-             }
+            }
+            print!("{output_str}");
         }
-    } 
+    }
     //== Subcmd: clean ==//
     else if Config::global().clean {
+        let mut whitelist = vec![];
+        if Config::global().whitelist != "" {
+           let filepath = path::PathBuf::try_from(&Config::global().whitelist)
+               .expect("Failed to convert whitelist into a PathBuf");
+           whitelist = parse_whitelist(&filepath.as_path())
+               .expect("Failed to parse whitelist");
+        }
+
         for cookie_db in cookie_dbs {
+            // Skip profiles if a specific --profile was passed
+            if Config::global().profile != "" &&
+             !cookie_db.path.to_string_lossy()
+              .contains(&Config::global().profile) {
+                 continue;
+            }
             infoln!("Cleaning {}", cookie_db.path_short());
+            cookie_db.clean(&whitelist, Config::global().apply)
+                .expect("Failed to delete cookies from database");
         }
 
     } else {
