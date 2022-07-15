@@ -10,7 +10,7 @@ mod macros;
 mod types;
 mod cookie;
 mod cookie_db;
-use crate::config::{Args,Config,CONFIG,COOKIE_FIELDS};
+use crate::config::{Args,Config,CONFIG,COOKIE_FIELDS,ALL_FIELDS};
 use crate::funcs::{cookie_db_type,process_is_running,cookie_dbs_from_profiles,parse_whitelist};
 use crate::types::CookieDB;
 
@@ -73,7 +73,8 @@ fn main() -> Result<(),()> {
         }
     }
     else if Config::global().fields != "" && cookie_dbs.len() > 0 {
-        let multiple_fields = Config::global().fields.find(",").is_some();
+        let multiple_fields = Config::global().fields
+            .find(",").is_some() || Config::global().fields == ALL_FIELDS;
 
         for mut cookie_db in cookie_dbs {
             // Skip profiles if a specific --profile was passed
@@ -96,10 +97,12 @@ fn main() -> Result<(),()> {
                  c.host.contains(&Config::global().domain) {
 
                     output_str = output_str +
-                        &c.fields_as_str(&Config::global().fields) + "\n";
+                        &c.fields_as_str(&Config::global().fields,
+                            multiple_fields
+                        ) + "\n";
 
                     if multiple_fields {
-                        // Skip blankline for single entries
+                        // Skip blankline if only one field is being printed
                         output_str = output_str + "\n"
                     }
                 }
@@ -128,7 +131,11 @@ fn main() -> Result<(),()> {
             cookie_db.clean(&whitelist, Config::global().apply)
                 .expect("Failed to delete cookies from database");
         }
-
+        if Config::global().apply {
+            infoln!("== Deletions commited ==");
+        } else {
+            infoln!("To perform deletions, pass `--apply`");
+        }
     } else {
        let mut args_cmd = Args::command();
        args_cmd.print_help().unwrap();

@@ -42,6 +42,7 @@ pub const COOKIE_FIELDS: phf::Map<&'static str, [&'static str; 2]> = phf_map!{
 };
 
 pub const ENCRYPTED_VALUE: &'static str = "********";
+pub const ALL_FIELDS: &'static str = "All";
 
 //=== CLI arguments ===//
 #[derive(Debug,Subcommand)]
@@ -56,7 +57,10 @@ enum SubArgs {
         #[clap(long, takes_value = false)]
         list_fields: bool,
 
-        /// Comma separated list of fields to list
+        /// Comma separated list of fields to list.
+        /// If only a single field is supplied, no key names
+        /// will be present in the output.
+        /// `All` can be supplied as a meta option.
         #[clap(short, long, default_value = "Host,Name")]
         fields: String,
 
@@ -84,7 +88,7 @@ enum SubArgs {
 
 #[derive(Parser, Debug)]
 #[clap(version = "1.0", author = "Kafva <https://github.com/Kafva>",
-  about = "Cookie manager")]
+  about = "CLI cookie manager for Firefox and Chromium")]
 /// https://github.com/clap-rs/clap/blob/v3.2.7/examples/derive_ref/README.md#arg-attributes
 pub struct Args {
     /// Debug mode
