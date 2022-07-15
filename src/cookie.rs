@@ -2,6 +2,7 @@ use std::fmt;
 use chrono::{TimeZone,Utc};
 use crate::types::Cookie;
 use crate::{Config,COOKIE_FIELDS};
+use crate::config::ENCRYPTED_VALUE;
 
 /// The output format of cookie fields listed with the `cookies` option
 fn field_fmt<T: fmt::Display>(name: &'static str, value: T) -> String {
@@ -29,7 +30,14 @@ impl Cookie {
                     field_fmt("Name", self.name.to_owned() )
                 },
                 "Value" =>      {
-                    field_fmt("Value", self.value.to_owned())
+                    let has_enc = self.value.is_empty() && 
+                             !self.encrypted_value.is_empty();
+                    let val = if has_enc {
+                        String::from(ENCRYPTED_VALUE)
+                     } else {
+                        self.value.to_owned()
+                     };
+                    field_fmt("Value", val)
                 },
                 "Path" =>       {
                     field_fmt("Path", self.path.to_owned() )

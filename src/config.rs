@@ -42,6 +42,8 @@ pub const COOKIE_FIELDS: phf::Map<&'static str, [&'static str; 2]> = phf_map!{
     "SameSite"   => ["samesite",         "sameSite"],
 };
 
+pub const ENCRYPTED_VALUE: &'static str = "********";
+
 //=== CLI arguments ===//
 #[derive(Debug,Subcommand)]
 enum SubArgs {
@@ -101,7 +103,7 @@ pub struct Args {
 
     /// Perform all commands on a supplied cookie database
     /// (overrides --profile)
-    #[clap(long,short)]
+    #[clap(long, short, default_value_t)]
     file: String,
 
     #[clap(subcommand)]

@@ -1,3 +1,6 @@
+use crypto::pbkdf2::pbkdf2;
+use crypto::hmac::Hmac;
+use crypto::sha1::Sha1;
 use crate::config::COOKIE_FIELDS;
 use crate::types::{DbType,CookieDB,Cookie};
 use crate::funcs::get_home;
@@ -29,7 +32,7 @@ impl CookieDB {
     ///
     /// Cookies with a Session-only lifetime will have 0 as their
     /// expiry date in Chrome
-    fn get_unix_epoch(self: &Self, timestamp:i64) -> i64 {
+    fn get_unix_epoch(&self, timestamp:i64) -> i64 {
         if timestamp == 0 {
             0
         } else if self.typing == DbType::Firefox {
@@ -39,13 +42,41 @@ impl CookieDB {
         }
     }
 
+    /// Attempt to decrypt and load values from the `encrypted_value` column
+    /// of a Chrome database.
+    /// Adapted from:
+    /// https://github.com/bertrandom/chrome-cookies-secure/blob/master/index.js
+    fn decrypt_encrypted_values(&self)  {
+        match std::env::consts::OS {
+        "macos"  => {
+            let password = "peanuts";
+            let salt = "saltysalt";
+            let rounds = 16;
+            let mut mac = Hmac::new(Sha1::new(), password.as_bytes());
+            let mut derived_key: [u8;16] = [0;16];
+
+            pbkdf2(&mut mac, salt.as_bytes(), rounds, &mut derived_key);
+
+            println!("KEY: {:#?}", derived_key)
+        },
+        //"macos"  => {
+        //},
+        _ => {
+        if get_home().starts_with("/mnt/c/Users") { // WSL
+        }}
+        }
+    }
+
     /// Load all cookies from the current `path` into the `cookies` vector
     pub fn load_cookies(&mut self) -> Result<(), rusqlite::Error> {
         let conn = rusqlite::Connection::open(&self.path)?;
         let field_idx = if self.typing==DbType::Chrome {0} else {1};
+        let encrypted_field = if self.typing==DbType::Chrome
+                 {"encrypted_value"} else
+                 {"NULL"};
 
         let query = format!(
-            "SELECT {},{},{},{},{},{},{},{},{},{} FROM {};",
+            "SELECT {},{},{},{},{},{},{},{},{},{},{} FROM {};",
             COOKIE_FIELDS["Host"][field_idx],
             COOKIE_FIELDS["Name"][field_idx],
             COOKIE_FIELDS["Value"][field_idx],
@@ -56,30 +87,36 @@ impl CookieDB {
             COOKIE_FIELDS["HttpOnly"][field_idx],
             COOKIE_FIELDS["Secure"][field_idx],
             COOKIE_FIELDS["SameSite"][field_idx],
+            encrypted_field,
             self.table_name()
         );
         let mut stmt = conn.prepare(&query)?;
         let results_iter = stmt.query_map([], |row| {
             // The second parameter to get() denotes
             // the underlying type that the fetched field is expected to have
+            //
+            // We use .unwrap() to get notified explicitly notified
+            // of parsing failures
             Ok(
                 Cookie {
-                    host: row.get::<_,String>(0)?,
-                    name: row.get::<_,String>(1)?,
-                    value: row.get::<_,String>(2)?,
-                    path: row.get::<_,String>(3)?,
+                    host: row.get::<_,String>(0).unwrap(),
+                    name: row.get::<_,String>(1).unwrap(),
+                    value: row.get::<_,String>(2).unwrap(),
+                    path: row.get::<_,String>(3).unwrap(),
                     creation: self.get_unix_epoch(
-                        row.get::<_,i64>(4)?
+                        row.get::<_,i64>(4).unwrap()
                     ),
                     expiry: self.get_unix_epoch(
-                        row.get::<_,i64>(5)?
+                        row.get::<_,i64>(5).unwrap()
                     ),
                     last_access: self.get_unix_epoch(
-                        row.get::<_,i64>(6)?
+                        row.get::<_,i64>(6).unwrap()
                     ),
-                    http_only: row.get::<_,bool>(7)?,
-                    secure: row.get::<_,bool>(8)?,
-                    samesite: row.get::<_,i32>(9)?
+                    http_only: row.get::<_,bool>(7).unwrap(),
+                    secure: row.get::<_,bool>(8).unwrap(),
+                    samesite: row.get::<_,i32>(9).unwrap(),
+                    encrypted_value: row.get::<_,Vec<u8>>(10)
+                        .unwrap_or(vec![])
                 }
             )
         })?;
@@ -89,6 +126,12 @@ impl CookieDB {
         // before calling collect
         self.cookies = results_iter.filter_map(|r| r.ok() ).collect();
 
+        if self.typing == DbType::Chrome {
+            self.decrypt_encrypted_values()
+        }
+
+        stmt.finalize().unwrap();
+        conn.close().unwrap();
         Ok(())
     }
 }
@@ -102,10 +145,10 @@ mod tests {
 
     #[test]
     fn test_path_short() {
-        let mut cdb = CookieDB { 
-            path: PathBuf::from("./cookies.sqlite"), 
-            typing: DbType::Chrome, 
-            cookies: vec![] 
+        let mut cdb = CookieDB {
+            path: PathBuf::from("./cookies.sqlite"),
+            typing: DbType::Chrome,
+            cookies: vec![]
         };
         assert_eq!(cdb.path_short(), "./cookies.sqlite");
 

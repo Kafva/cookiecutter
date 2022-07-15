@@ -42,7 +42,10 @@ pub struct Cookie {
     ///     Strict == 2
     ///     Lax == 1
     ///     None == 0
-    pub samesite: i32
+    pub samesite: i32,
+
+    /// The encrypted value of a cooke, unique to Chrome
+    pub encrypted_value: Vec<u8>
 }
 
 #[derive(Debug)]
