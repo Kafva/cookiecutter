@@ -11,7 +11,9 @@ mod types;
 mod cookie;
 mod cookie_db;
 mod tui;
-use crate::config::{Args,Config,CONFIG,COOKIE_FIELDS,ALL_FIELDS};
+use crate::config::{
+    Args,Config,CONFIG,COOKIE_FIELDS,ALL_FIELDS,DEBUG_LOG
+};
 use crate::funcs::{cookie_db_type,process_is_running,cookie_dbs_from_profiles,parse_whitelist};
 use crate::types::CookieDB;
 use crate::tui::run;
@@ -141,6 +143,9 @@ fn main() -> Result<(),()> {
     } 
     //== Subcmd: tui ==//
     else if Config::global().tui {
+        // Delete any previous debug log
+        std::fs::remove_file(DEBUG_LOG).unwrap_or_default();
+
         cookie_dbs.iter_mut().for_each(|c| 
            c.load_cookies().expect("Failed to load cookies")
         );

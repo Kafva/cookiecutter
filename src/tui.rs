@@ -1,6 +1,9 @@
 use std::{
-    io, time::Duration, time::Instant,
-    collections::HashMap
+    io,
+    io::Write,
+    time::Duration, time::Instant,
+    collections::HashMap,
+    fs::OpenOptions,
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
@@ -15,36 +18,10 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 
-
-use crate::types::{CookieDB,Cookie};
-
-pub fn run(cookie_dbs: &Vec<CookieDB>) -> Result<(),io::Error> {
-    // Disable certain parts of the terminal's default behaviour
-    //  https://docs.rs/crossterm/0.23.2/crossterm/terminal/index.html#raw-mode
-    enable_raw_mode()?; 
-    let mut stdout = std::io::stdout();
-
-    // Enter fullscreen (crossterm API)
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-
-    let mut terminal = Terminal::new(backend)?;
-    let tick_rate = Duration::from_millis(250);
-    let mut state = State::from_cookie_dbs(&cookie_dbs);
-
-    run_ui(&mut terminal, &mut state, tick_rate).unwrap();
-
-    // Restore default terminal behaviour
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-    Ok(())
-}
-
+use crate::{
+    config::DEBUG_LOG,
+    types::{CookieDB,Cookie}
+};
 
 //============================================================================//
 struct StatefulList<T> {
@@ -96,7 +73,7 @@ impl<T> StatefulList<T> {
 // Desired functionality:
 //  leveled list menu:
 //  [profile list] -> [domain list] -> [cookie list] -> [field list (view only)]
-//  Global keymappings: 
+//  Global key mappings: 
 //  h/j/k/l : Movement
 //  D       : Delete current item, (Not valid at profile level)
 //
@@ -149,7 +126,6 @@ impl<'a> State<'a> {
               cdb.path_short(), 
               StatefulList::with_items(hst_names)
            );
-
         }
 
         State {
@@ -158,7 +134,37 @@ impl<'a> State<'a> {
     }
 }
 
+//============================================================================//
 
+/// Entrypoint for the TUI
+pub fn run(cookie_dbs: &Vec<CookieDB>) -> Result<(),io::Error> {
+    // Disable certain parts of the terminal's default behaviour
+    //  https://docs.rs/crossterm/0.23.2/crossterm/terminal/index.html#raw-mode
+    enable_raw_mode()?; 
+    let mut stdout = std::io::stdout();
+
+    // Enter fullscreen (crossterm API)
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+
+    let mut terminal = Terminal::new(backend)?;
+    let tick_rate = Duration::from_millis(250);
+    let mut state = State::from_cookie_dbs(&cookie_dbs);
+
+    run_ui(&mut terminal, &mut state, tick_rate).unwrap();
+
+    // Restore default terminal behaviour
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+    Ok(())
+}
+
+/// Application loop
 fn run_ui<B: Backend>(
     terminal: &mut Terminal<B>,
     state: &mut State,
@@ -171,14 +177,12 @@ fn run_ui<B: Backend>(
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
             .unwrap_or_else(|| Duration::from_secs(0));
+
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') => return Ok(()),
-                    KeyCode::Left => state.profiles.unselect(),
-                    KeyCode::Down => state.profiles.next(),
-                    KeyCode::Up => state.profiles.previous(),
-                    _ => {}
+                    _ => handle_key(key.code, state)
                 }
             }
         }
@@ -188,6 +192,27 @@ fn run_ui<B: Backend>(
     }
 }
 
+/// Handle keyboard input
+fn handle_key(code: KeyCode, state: &mut State) {
+    match code {
+        KeyCode::Left|KeyCode::Char('h') => {
+            state.profiles.unselect();
+        },
+        KeyCode::Down|KeyCode::Char('j') => {
+            state.profiles.next();
+        },
+        KeyCode::Up|KeyCode::Char('k') => {
+            state.profiles.previous();
+        },
+        KeyCode::Right|KeyCode::Char('l') => { 
+            state.selected_split = if state.selected_split == 2 
+                                   {2} else {state.selected_split+1}
+        },
+        _ => {  }
+    }
+}
+
+/// Render the UI, called on each tick
 fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
     // Create two chunks with equal horizontal screen space
     let chunks = Layout::default()
@@ -198,23 +223,58 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
              Constraint::Percentage(33)
         ].as_ref()).split(frame.size());
 
-    let items: Vec<ListItem> = state.profiles.items.iter().map(|p| {
+
+    // Profiles
+    let profile_items: Vec<ListItem> = state.profiles.items.iter().map(|p| {
         ListItem::new(p.as_str()).style(Style::default())
     }).collect();
 
-    // Create a List from all list items and highlight the 
-    // currently selected one
-    let items = List::new(items)
-        .block(Block::default().borders(Borders::RIGHT).title("Profiles"))
+    let profile_list = create_list(profile_items);
+
+    frame.render_stateful_widget(
+        profile_list, chunks[0], &mut state.profiles.state
+    );
+
+
+    // Fetch the currently selected profile
+    let selected = state.profiles.state.selected().unwrap_or_default();
+    debug_log(selected);
+
+
+    // Domains
+    //let profile_items: Vec<ListItem> = state.domains[].iter().map(|p| {
+    //    ListItem::new(p.as_str()).style(Style::default())
+    //}).collect();
+
+    //let profile_list = create_list(domain_items);
+
+    //frame.render_stateful_widget(
+    //    profile_list, chunks[0], &mut state.profiles.state
+    //);
+}
+
+fn create_list(items: Vec<ListItem>) -> List {
+    List::new(items)
+        .block(Block::default().borders(Borders::RIGHT)
+        .title("tmp"))
         .highlight_style(
             Style::default()
                 .bg(Color::LightGreen)
                 .fg(Color::Black)
                 .add_modifier(Modifier::BOLD),
         )
-        .highlight_symbol(">> ");
+        .highlight_symbol(">> ")
+}
 
-    // We can now render the item list
-    frame.render_stateful_widget(items, chunks[0], &mut state.profiles.state);
+/// Print a debug message to `DEBUG_LOG`
+fn debug_log<T: std::fmt::Display>(msg: T) -> Result<(),io::Error> {
+    let mut f = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(DEBUG_LOG)
+        .unwrap();
+
+    writeln!(f,"-> {msg}")?;
+    Ok(())
 }
 
