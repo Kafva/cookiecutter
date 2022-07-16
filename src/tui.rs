@@ -133,23 +133,17 @@ impl<'a> State<'a> {
         }
     }
 
-    // Determine the currently selected profile (if any)
-    //fn selected_profile(&self) -> Option<usize> {
-    //    let selected: usize = self.profiles.state.selected()
-    //            .unwrap_or_else(|| NO_SELECTION);
-    //    if selected != NO_SELECTION {
-    //        Some(selected)
-    //    } else {
-    //       None
-    //    }
-    //}
-
-    // Determine the currently selected profile (if any)
-    fn selected_profile(self: &Self) -> Option<&String> {
+    /// Determine the currently selected profile (if any)
+    /// To allow borrows upon other attributes of the state object 
+    /// after a call to `selected_profile()` we can NOT
+    /// return a borrowed &String.
+    ///
+    /// rustc --explain E0502
+    fn selected_profile(self: &Self) -> Option<String> {
         let selected: usize = self.profiles.state.selected()
                 .unwrap_or_else(|| NO_SELECTION);
         if selected != NO_SELECTION {
-            self.profiles.items.get(selected)
+            Some(self.profiles.items.get(selected).unwrap().clone())
         } else {
            None
         }
@@ -160,16 +154,6 @@ impl<'a> State<'a> {
 //============================================================================//
 
 
-/// Determine the currently selected profile (if any)
-//fn selected_profile<'a>(state: &mut State) -> Option<&mut String> {
-//    let selected: usize = state.profiles.state.selected()
-//            .unwrap_or_else(|| NO_SELECTION);
-//    if selected != NO_SELECTION {
-//        state.profiles.items.get_mut(selected)
-//    } else {
-//       None
-//    }
-//}
 
 
 /// Handle keyboard input
@@ -196,27 +180,15 @@ fn handle_key(code: KeyCode, state: &mut State) {
                       // Move to the next split
                       state.selected_split+=1;
 
-                      // If there is a currently selected profile,
-                      // fetch the domains for this profile and select
-                      // the first entry
                       let curr_profile = state.selected_profile();
                       if curr_profile.is_some() {
-
-
-                          // The borrow checker gets mad if we try to
-                          // use the `curr_profile` directly, it complains
-                          // that the `selected_profile()` method already
-                          // returns a borrowed value from `state`
-                          let curr_profile = curr_profile.unwrap().clone();
-                          let domains_for_profile = state.domains
-                                            .get_mut(&curr_profile).unwrap();
+                          // Fetch the domains for the current profile
+                          let domains_for_profile = 
+                                state.domains.get_mut(&curr_profile.unwrap())
+                                    .unwrap();
                           
-                          //let curr_profile = curr_profile.unwrap();
-                          //let domains_for_profile = state.domains
-                          //                  .get_mut(curr_profile).unwrap();
-
-
-                          // Select the domain
+                          // Select the first domain
+                          // TODO: handle case where no domains exist
                           domains_for_profile.state.select(Some(0));
                       }
                    },
