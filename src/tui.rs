@@ -19,7 +19,7 @@ use crossterm::{
 };
 
 use crate::{
-    config::{DEBUG_LOG,NO_SELECTION},
+    config::{DEBUG_LOG,NO_SELECTION,INVALID_SPLIT_ERR},
     types::{CookieDB,Cookie}
 };
 
@@ -95,6 +95,7 @@ struct State<'a> {
     cookies: HashMap<String,StatefulList<&'a Cookie>>,
 }
 impl<'a> State<'a> {
+    /// Create a TUI state object from a vector of cookie databases
     fn from_cookie_dbs(cookie_dbs: &Vec<CookieDB>) -> State {
         // Statefil list of profiles
         let profiles = StatefulList::with_items(
@@ -133,52 +134,17 @@ impl<'a> State<'a> {
         }
     }
 
-    /// Determine the currently selected profile (if any)
-    /// To allow borrows upon other attributes of the state object 
-    /// after a call to `selected_profile()` we can NOT
-    /// return a borrowed &String.
-    ///
-    /// rustc --explain E0502
-    //fn selected_profile(self: &Self) -> Option<String> {
-    //    let selected: usize = self.profiles.state.selected()
-    //            .unwrap_or_else(|| NO_SELECTION);
-    //    if selected != NO_SELECTION {
-    //        Some(self.profiles.items.get(selected).unwrap().clone())
-    //    } else {
-    //       None
-    //    }
-    //}
-
-    //fn _selected_profile(self: &Self) -> Option<&String> {
-    //    let selected: usize = self.profiles.state.selected()
-    //            .unwrap_or_else(|| NO_SELECTION);
-    //    if selected != NO_SELECTION {
-    //        self.profiles.items.get(selected)
-    //    } else {
-    //       None
-    //    }
-    //}
-
+    /// Fetch the `StatefulList` of domains for the currently selected profile
     fn domains_for_profile(&mut self) -> Option<&mut StatefulList<&'a str>> {
-        //let curr_profile = self._selected_profile();
-
         let selected: usize = self.profiles.state.selected()
                 .unwrap_or_else(|| NO_SELECTION);
         if selected != NO_SELECTION {
-            
-            // Fetch the domains for the current profile
+            // Note that the reference is mutable, this is required to call
+            // e.g. `select()` and `unselect()`
             self.domains.get_mut(self.profiles.items.get(selected).unwrap())
         } else {
            None
         }
-
-
-        //if curr_profile.is_some() {
-        //    // Fetch the domains for the current profile
-        //    self.domains.get_mut(&curr_profile.unwrap())
-        //} else {
-        //  None
-        //}
     }
 }
 
@@ -199,7 +165,7 @@ fn handle_key(code: KeyCode, state: &mut State) {
                   }
                 }
                 2 => {  }
-               _ => panic!("Invalid split selection")
+               _ => panic!("{}", INVALID_SPLIT_ERR)
             }
 
         },
@@ -214,7 +180,7 @@ fn handle_key(code: KeyCode, state: &mut State) {
 
                 }
                 2 => {  }
-               _ => panic!("Invalid split selection")
+               _ => panic!("{}", INVALID_SPLIT_ERR)
             }
             // TODO call next on the correct list
         },
@@ -228,7 +194,7 @@ fn handle_key(code: KeyCode, state: &mut State) {
                   }
                 }
                 2 => {  }
-               _ => panic!("Invalid split selection")
+               _ => panic!("{}", INVALID_SPLIT_ERR)
             }
             // TODO call previous on the correct list
         },
@@ -236,32 +202,19 @@ fn handle_key(code: KeyCode, state: &mut State) {
             if state.selected_split < 2 {
                match state.selected_split {
                    0 => {
-                      // Move to the next split
-                      state.selected_split+=1;
-
                       let domain = state.domains_for_profile();
                       if domain.is_some() {
+                          // TODO: handle case where no domains exist
                           domain.unwrap().state.select(Some(0));
+                          state.selected_split+=1;
                       }
-
-                      //let curr_profile = state.selected_profile();
-                      //if curr_profile.is_some() {
-                      //    // Fetch the domains for the current profile
-                      //    let domains_for_profile = 
-                      //          state.domains.get_mut(&curr_profile.unwrap())
-                      //              .unwrap();
-                      //    
-                      //    // Select the first domain
-                      //    // TODO: handle case where no domains exist
-                      //    domains_for_profile.state.select(Some(0));
-                      //}
                    },
                    1 => {
                       state.selected_split+=1;
                       // Select the first item from the current
                       // `cookies_for_domain`
                    }
-                   _ => panic!("Invalid split selection")
+                   _ => panic!("{}", INVALID_SPLIT_ERR)
                }
 
             }
