@@ -134,6 +134,19 @@ impl<'a> State<'a> {
         }
     }
 
+    /// To avoid BC issues when borrowing other parts of the state,
+    /// this method returns a cloned string instead of a borrowed reference
+    fn _selected_profile(&self) -> Option<String> {
+        let selected: usize = self.profiles.state.selected()
+                .unwrap_or_else(|| NO_SELECTION);
+        if selected != NO_SELECTION {
+            Some(self.profiles.items.get(selected).unwrap().clone())
+        } else {
+           None
+        }
+
+    }
+
     /// Fetch the `StatefulList` of domains for the currently selected profile
     fn domains_for_profile(&mut self) -> Option<&mut StatefulList<&'a str>> {
         let selected: usize = self.profiles.state.selected()
@@ -146,6 +159,32 @@ impl<'a> State<'a> {
            None
         }
     }
+
+    /// Fetch the `StatefulList` of cookies for the currently selected domain 
+    /// of a specific profile
+    fn cookies_for_domain(&mut self) -> Option<&mut StatefulList<&'a Cookie>> {
+        let current_profile = self._selected_profile();
+        if current_profile.is_some() {
+            // .clone() to dodge BC
+            let current_profile = current_profile.unwrap().clone();
+
+            let current_domains = self.domains_for_profile();
+            if current_domains.is_some() {
+                let current_domains = current_domains.unwrap();
+                let selected_idx = current_domains.state.selected().unwrap();
+                let current_domain = // .clone() to dodge BC
+                    current_domains.items.get(selected_idx).unwrap().clone();
+
+                let key = format!("{}{}", current_profile, current_domain);
+                self.cookies.get_mut(&key)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
 }
 
 //============================================================================//
@@ -307,22 +346,18 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
         profile_list, chunks[0], &mut state.profiles.state
     );
 
-    // Determine the currently selected profile (if any)
-    let selected: usize = state.profiles.state.selected()
-            .unwrap_or_else(|| NO_SELECTION);
+    //== Domains ==//
+    // Add the domains of the selected profile to the second chunk
+    //let selected_profile = state.profiles.items.get(selected).unwrap();
 
-    if selected != NO_SELECTION {
-        //== Domains ==//
-        // Add the domains of the selected profile to the second chunk
-        let selected_profile = state.profiles.items.get(selected).unwrap();
+    // Note that `domains_for_profile` and `cookies_for_domain`
+    // need to mutably borrowed to support updatates in the frame
+    let domains = state.domains_for_profile();
 
-        // Note that `domains_for_profile` and `cookies_for_domain`
-        // need to mutably borrowed to support updatates in the frame
-        let domains_for_profile  = state.domains.get_mut(
-            selected_profile
-        ).unwrap();
+    if domains.is_some() {
+        let domains = domains.unwrap();
 
-        let domain_items: Vec<ListItem> = domains_for_profile
+        let domain_items: Vec<ListItem> = domains
             .items.iter().map(|p| {
                 ListItem::new(*p).style(Style::default())
         }).collect();
@@ -331,18 +366,21 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 
         //== Cookies ==//
         // Determine the currently selected domain
-        let selected: usize = domains_for_profile.state.selected()
-            .unwrap_or_else(|| NO_SELECTION);
-        if selected != NO_SELECTION {
-            let selected_domain = domains_for_profile.items
-                .get(selected).unwrap();
+        //let selected: usize = domains.state.selected()
+        //    .unwrap_or_else(|| NO_SELECTION);
+        //if selected != NO_SELECTION {
+        //    let selected_domain = domains.items
+        //        .get(selected).unwrap();
 
-            // Add the cookies of the selected domain to the third chunk
-            let cookies_for_domain  = state.cookies.get_mut(
-                &format!("{}{}", selected_profile, selected_domain)
-            ).unwrap();
+        //    // Add the cookies of the selected domain to the third chunk
+        //    let cookies_for_domain  = state.cookies.get_mut(
+        //        &format!("{}{}", selected_profile, selected_domain)
+        //    ).unwrap();
 
-            let cookie_items: Vec<ListItem> = cookies_for_domain.items.iter()
+        let cookies = state.cookies_for_domain();
+        if cookies.is_some() {
+            let cookies = cookies.unwrap();
+            let cookie_items: Vec<ListItem> = cookies.items.iter()
                 .map(|c| {
                     ListItem::new(c.name.as_str()).style(Style::default())
             }).collect();
@@ -352,15 +390,17 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 
             //== Render cookies ==//
             frame.render_stateful_widget(
-                cookie_list, chunks[2], &mut cookies_for_domain.state
+                cookie_list, chunks[2], &mut cookies.state
             );
         }
 
         //== Render domains ==//
         frame.render_stateful_widget(
-            domain_list, chunks[1], &mut domains_for_profile.state
+            domain_list, chunks[1], &mut domains.state
         );
+
     }
+
 }
 
 fn create_list(items: Vec<ListItem>, title: String) -> List {
