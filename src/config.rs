@@ -91,7 +91,7 @@ enum SubArgs {
   about = "CLI cookie manager for Firefox and Chromium")]
 /// https://github.com/clap-rs/clap/blob/v3.2.7/examples/derive_ref/README.md#arg-attributes
 pub struct Args {
-    /// Debug mode
+    /// Output debugging information
     #[clap(short, long)]
     debug: bool,
 
@@ -191,7 +191,7 @@ impl Config {
                 cfg.apply = apply;
                 cfg.whitelist = whitelist; cfg
             }
-            Some(SubArgs::Tui {  }) => { cfg }
+            Some(SubArgs::Tui {}) => { cfg.tui = true; cfg }
             None => { cfg }
         }
     }

@@ -10,9 +10,11 @@ mod macros;
 mod types;
 mod cookie;
 mod cookie_db;
+mod tui;
 use crate::config::{Args,Config,CONFIG,COOKIE_FIELDS,ALL_FIELDS};
 use crate::funcs::{cookie_db_type,process_is_running,cookie_dbs_from_profiles,parse_whitelist};
 use crate::types::CookieDB;
+use crate::tui::run;
 
 fn main() -> Result<(),()> {
     // Load command line configuration arguments into a global
@@ -132,10 +134,14 @@ fn main() -> Result<(),()> {
                 .expect("Failed to delete cookies from database");
         }
         if Config::global().apply {
-            infoln!("== Deletions commited ==");
+            infoln!("== Deletions committed ==");
         } else {
             infoln!("To perform deletions, pass `--apply`");
         }
+    } 
+    //== Subcmd: tui ==//
+    else if Config::global().tui {
+        run().expect("Failed to create the TUI");
     } else {
        let mut args_cmd = Args::command();
        args_cmd.print_help().unwrap();
