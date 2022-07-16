@@ -106,6 +106,8 @@ impl CookieDB {
         Ok(())
     }
 
+    /// Remove all cookies from the underlying database except those
+    /// from a domain within the whitelist
     pub fn clean(&self, whitelist: &Vec<String>, apply: bool)
      -> Result<(), rusqlite::Error> {
         let field_idx = if self.typing==DbType::Chrome {0} else {1};

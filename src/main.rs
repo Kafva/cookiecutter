@@ -141,7 +141,10 @@ fn main() -> Result<(),()> {
     } 
     //== Subcmd: tui ==//
     else if Config::global().tui {
-        run().expect("Failed to create the TUI");
+        cookie_dbs.iter_mut().for_each(|c| 
+           c.load_cookies().expect("Failed to load cookies")
+        );
+        run(&cookie_dbs).expect("Failed to create TUI");
     } else {
        let mut args_cmd = Args::command();
        args_cmd.print_help().unwrap();

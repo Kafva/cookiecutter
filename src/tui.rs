@@ -1,4 +1,7 @@
-use std::{io, thread, time::Duration, time::Instant};
+use std::{
+    io, time::Duration, time::Instant,
+    collections::HashMap
+};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
@@ -12,13 +15,10 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 
-// Desired functionality:
-//  three level list menu:
-//  [profile list] -> [domain list] -> [cookie list] -> [field list (view only)]
-//  Global keymappings: 
-//  h/j/k/l : Movement
-//  D       : Delete current item, (Not valid at profile level)
-pub fn run() -> Result<(),io::Error> {
+
+use crate::types::{CookieDB,Cookie};
+
+pub fn run(cookie_dbs: &Vec<CookieDB>) -> Result<(),io::Error> {
     // Disable certain parts of the terminal's default behaviour
     //  https://docs.rs/crossterm/0.23.2/crossterm/terminal/index.html#raw-mode
     enable_raw_mode()?; 
@@ -30,11 +30,9 @@ pub fn run() -> Result<(),io::Error> {
 
     let mut terminal = Terminal::new(backend)?;
     let tick_rate = Duration::from_millis(250);
-    let mut app = App::new();
+    let mut state = State::from_cookie_dbs(&cookie_dbs);
 
-    run_ui(&mut terminal, &mut app, tick_rate).unwrap();
-
-    thread::sleep(Duration::from_millis(5000));
+    run_ui(&mut terminal, &mut state, tick_rate).unwrap();
 
     // Restore default terminal behaviour
     disable_raw_mode()?;
@@ -95,39 +93,67 @@ impl<T> StatefulList<T> {
     }
 }
 
-struct App<'a> {
-    items: StatefulList<(&'a str, usize)>
+// Desired functionality:
+//  leveled list menu:
+//  [profile list] -> [domain list] -> [cookie list] -> [field list (view only)]
+//  Global keymappings: 
+//  h/j/k/l : Movement
+//  D       : Delete current item, (Not valid at profile level)
+//
+//  View 1:
+//  |profiles|domains|cookie names|
+//
+//  View 2:
+//  |domains|cookie names|field list|
+
+/// The main struct which holds the global state of the TUI
+struct State<'a> {
+    selected_split: u32,
+    profiles: StatefulList<String>,
+
+    // The cookies and domain lists will need to be updatable
+    // profile        -> stateful list of domains
+    // profile+domain -> stateful list of cookies
+    domains: HashMap<String,StatefulList<&'a str>>,
+    cookies: HashMap<String,StatefulList<&'a Cookie>>,
 }
-impl<'a> App<'a> {
-    fn new() -> App<'a> {
-        App {
-            items: StatefulList::with_items(vec![
-                ("Item0", 1),
-                ("Item1", 2),
-                ("Item2", 1),
-                ("Item3", 3),
-                ("Item4", 1),
-                ("Item5", 4),
-                ("Item6", 1),
-                ("Item7", 3),
-                ("Item8", 1),
-                ("Item9", 6),
-                ("Item10", 1),
-                ("Item11", 3),
-                ("Item12", 1),
-                ("Item13", 2),
-                ("Item14", 1),
-                ("Item15", 1),
-                ("Item16", 4),
-                ("Item17", 1),
-                ("Item18", 5),
-                ("Item19", 4),
-                ("Item20", 1),
-                ("Item21", 2),
-                ("Item22", 1),
-                ("Item23", 3),
-                ("Item24", 1),
-            ]),
+impl<'a> State<'a> {
+    fn from_cookie_dbs(cookie_dbs: &Vec<CookieDB>) -> State {
+        // Statefil list of profiles
+        let profiles = StatefulList::with_items( 
+            cookie_dbs.iter().map(|c| c.path_short()).collect()
+        );
+        let mut domains = HashMap::new();
+        let mut cookies = HashMap::new();
+
+        for cdb in cookie_dbs {
+           let mut hst_names: Vec<&str> = 
+               cdb.cookies.iter().map(|c| c.host.as_str()).collect();
+           hst_names.sort();
+           hst_names.dedup();
+
+           for hst_name in hst_names.as_slice() {
+                let cookies_for_hst = cdb.cookies.iter().filter(|c|
+                   c.host == **hst_name 
+                ).collect();
+
+                // Statefil list of cookies (per domain, per profile)
+                cookies.insert(
+                    cdb.path_short()+&hst_name,
+                    StatefulList::with_items(cookies_for_hst)
+                );
+           }
+
+            // Statefil list of domains (per profile)
+           domains.insert(
+              cdb.path_short(), 
+              StatefulList::with_items(hst_names)
+           );
+
+        }
+
+        State {
+            selected_split: 0, profiles, domains, cookies
         }
     }
 }
@@ -135,12 +161,12 @@ impl<'a> App<'a> {
 
 fn run_ui<B: Backend>(
     terminal: &mut Terminal<B>,
-    app: &mut App,
+    state: &mut State,
     tick_rate: Duration
 ) -> io::Result<()> {
     let mut last_tick = Instant::now();
     loop {
-        terminal.draw(|f| ui(f,app))?;
+        terminal.draw(|f| ui(f,state))?;
 
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
@@ -149,9 +175,9 @@ fn run_ui<B: Backend>(
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') => return Ok(()),
-                    KeyCode::Left => app.items.unselect(),
-                    KeyCode::Down => app.items.next(),
-                    KeyCode::Up => app.items.previous(),
+                    KeyCode::Left => state.profiles.unselect(),
+                    KeyCode::Down => state.profiles.next(),
+                    KeyCode::Up => state.profiles.previous(),
                     _ => {}
                 }
             }
@@ -162,34 +188,33 @@ fn run_ui<B: Backend>(
     }
 }
 
-//cookie_dbs: &HashSet<CookieDB>
-fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
     // Create two chunks with equal horizontal screen space
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-                     Constraint::Percentage(50), 
-                     Constraint::Percentage(50)]
-                     .as_ref())
-        .split(f.size());
+             Constraint::Percentage(33), 
+             Constraint::Percentage(33),
+             Constraint::Percentage(33)
+        ].as_ref()).split(frame.size());
 
-    let items: Vec<ListItem> = app.items.items.iter().map(|_| {
-        ListItem::new("LOL").style(Style::default()
-                                   .fg(Color::Black).bg(Color::White))
+    let items: Vec<ListItem> = state.profiles.items.iter().map(|p| {
+        ListItem::new(p.as_str()).style(Style::default())
     }).collect();
 
     // Create a List from all list items and highlight the 
     // currently selected one
     let items = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("List"))
+        .block(Block::default().borders(Borders::RIGHT).title("Profiles"))
         .highlight_style(
             Style::default()
                 .bg(Color::LightGreen)
+                .fg(Color::Black)
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol(">> ");
 
     // We can now render the item list
-    f.render_stateful_widget(items, chunks[0], &mut app.items.state);
+    frame.render_stateful_widget(items, chunks[0], &mut state.profiles.state);
 }
 
