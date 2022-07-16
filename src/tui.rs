@@ -139,38 +139,97 @@ impl<'a> State<'a> {
     /// return a borrowed &String.
     ///
     /// rustc --explain E0502
-    fn selected_profile(self: &Self) -> Option<String> {
+    //fn selected_profile(self: &Self) -> Option<String> {
+    //    let selected: usize = self.profiles.state.selected()
+    //            .unwrap_or_else(|| NO_SELECTION);
+    //    if selected != NO_SELECTION {
+    //        Some(self.profiles.items.get(selected).unwrap().clone())
+    //    } else {
+    //       None
+    //    }
+    //}
+
+    //fn _selected_profile(self: &Self) -> Option<&String> {
+    //    let selected: usize = self.profiles.state.selected()
+    //            .unwrap_or_else(|| NO_SELECTION);
+    //    if selected != NO_SELECTION {
+    //        self.profiles.items.get(selected)
+    //    } else {
+    //       None
+    //    }
+    //}
+
+    fn domains_for_profile(&mut self) -> Option<&mut StatefulList<&'a str>> {
+        //let curr_profile = self._selected_profile();
+
         let selected: usize = self.profiles.state.selected()
                 .unwrap_or_else(|| NO_SELECTION);
         if selected != NO_SELECTION {
-            Some(self.profiles.items.get(selected).unwrap().clone())
+            
+            // Fetch the domains for the current profile
+            self.domains.get_mut(self.profiles.items.get(selected).unwrap())
         } else {
            None
         }
-    }
 
+
+        //if curr_profile.is_some() {
+        //    // Fetch the domains for the current profile
+        //    self.domains.get_mut(&curr_profile.unwrap())
+        //} else {
+        //  None
+        //}
+    }
 }
 
 //============================================================================//
-
-
-
 
 /// Handle keyboard input
 fn handle_key(code: KeyCode, state: &mut State) {
     match code {
         KeyCode::Left|KeyCode::Char('h') => {
-            state.profiles.unselect();
-            state.selected_split = if state.selected_split == 0
-                                   {0} else {state.selected_split-1}
             // TODO call unselect() on the correct list
+            match state.selected_split {
+                0 => {  }
+                1 => { 
+                  let domain = state.domains_for_profile();
+                  if domain.is_some() {
+                    domain.unwrap().unselect();
+                    state.selected_split -= 1
+                  }
+                }
+                2 => {  }
+               _ => panic!("Invalid split selection")
+            }
+
         },
         KeyCode::Down|KeyCode::Char('j') => {
-            state.profiles.next();
+            match state.selected_split {
+                0 => { state.profiles.next() }
+                1 => {  
+                  let domain = state.domains_for_profile();
+                  if domain.is_some() {
+                      domain.unwrap().next()
+                  }
+
+                }
+                2 => {  }
+               _ => panic!("Invalid split selection")
+            }
             // TODO call next on the correct list
         },
         KeyCode::Up|KeyCode::Char('k') => {
-            state.profiles.previous();
+            match state.selected_split {
+                0 => { state.profiles.previous() }
+                1 => {  
+                  let domain = state.domains_for_profile();
+                  if domain.is_some() {
+                      domain.unwrap().previous()
+                  }
+                }
+                2 => {  }
+               _ => panic!("Invalid split selection")
+            }
             // TODO call previous on the correct list
         },
         KeyCode::Right|KeyCode::Char('l') => {
@@ -180,17 +239,22 @@ fn handle_key(code: KeyCode, state: &mut State) {
                       // Move to the next split
                       state.selected_split+=1;
 
-                      let curr_profile = state.selected_profile();
-                      if curr_profile.is_some() {
-                          // Fetch the domains for the current profile
-                          let domains_for_profile = 
-                                state.domains.get_mut(&curr_profile.unwrap())
-                                    .unwrap();
-                          
-                          // Select the first domain
-                          // TODO: handle case where no domains exist
-                          domains_for_profile.state.select(Some(0));
+                      let domain = state.domains_for_profile();
+                      if domain.is_some() {
+                          domain.unwrap().state.select(Some(0));
                       }
+
+                      //let curr_profile = state.selected_profile();
+                      //if curr_profile.is_some() {
+                      //    // Fetch the domains for the current profile
+                      //    let domains_for_profile = 
+                      //          state.domains.get_mut(&curr_profile.unwrap())
+                      //              .unwrap();
+                      //    
+                      //    // Select the first domain
+                      //    // TODO: handle case where no domains exist
+                      //    domains_for_profile.state.select(Some(0));
+                      //}
                    },
                    1 => {
                       state.selected_split+=1;
@@ -241,6 +305,10 @@ fn run_ui<B: Backend>(
     tick_rate: Duration
 ) -> io::Result<()> {
     let mut last_tick = Instant::now();
+
+    // Auto-select the first profile: TODO handle no-profiles
+    state.profiles.state.select(Some(0));
+
     loop {
         terminal.draw(|f| ui(f,state))?;
 
