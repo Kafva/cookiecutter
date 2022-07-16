@@ -171,12 +171,18 @@ impl<'a> State<'a> {
             let current_domains = self.domains_for_profile();
             if current_domains.is_some() {
                 let current_domains = current_domains.unwrap();
-                let selected_idx = current_domains.state.selected().unwrap();
-                let current_domain = // .clone() to dodge BC
-                    current_domains.items.get(selected_idx).unwrap().clone();
+                
+                let selected_idx = current_domains.state.selected()
+                    .unwrap_or_else(|| NO_SELECTION);
+                if selected_idx != NO_SELECTION {
+                    let current_domain = // .clone() to dodge BC
+                        current_domains.items.get(selected_idx).unwrap().clone();
 
-                let key = format!("{}{}", current_profile, current_domain);
-                self.cookies.get_mut(&key)
+                    let key = format!("{}{}", current_profile, current_domain);
+                    self.cookies.get_mut(&key)
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -347,11 +353,8 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
     );
 
     //== Domains ==//
-    // Add the domains of the selected profile to the second chunk
-    //let selected_profile = state.profiles.items.get(selected).unwrap();
-
-    // Note that `domains_for_profile` and `cookies_for_domain`
-    // need to mutably borrowed to support updatates in the frame
+    // `domains_for_profile` and `cookies_for_domain`
+    // need to mutably borrowed to support updates in the frame
     let domains = state.domains_for_profile();
 
     if domains.is_some() {
@@ -364,19 +367,12 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 
         let domain_list = create_list(domain_items, String::from("Domains"));
 
+        //== Render domains ==//
+        frame.render_stateful_widget(
+            domain_list, chunks[1], &mut domains.state
+        );
+
         //== Cookies ==//
-        // Determine the currently selected domain
-        //let selected: usize = domains.state.selected()
-        //    .unwrap_or_else(|| NO_SELECTION);
-        //if selected != NO_SELECTION {
-        //    let selected_domain = domains.items
-        //        .get(selected).unwrap();
-
-        //    // Add the cookies of the selected domain to the third chunk
-        //    let cookies_for_domain  = state.cookies.get_mut(
-        //        &format!("{}{}", selected_profile, selected_domain)
-        //    ).unwrap();
-
         let cookies = state.cookies_for_domain();
         if cookies.is_some() {
             let cookies = cookies.unwrap();
@@ -393,12 +389,6 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
                 cookie_list, chunks[2], &mut cookies.state
             );
         }
-
-        //== Render domains ==//
-        frame.render_stateful_widget(
-            domain_list, chunks[1], &mut domains.state
-        );
-
     }
 
 }
