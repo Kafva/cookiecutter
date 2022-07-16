@@ -43,6 +43,7 @@ pub const COOKIE_FIELDS: phf::Map<&'static str, [&'static str; 2]> = phf_map!{
 
 pub const ENCRYPTED_VALUE: &'static str = "********";
 pub const ALL_FIELDS: &'static str = "All";
+pub const NO_SELECTION: usize = 9999999;
 pub const DEBUG_LOG: &'static str = "rokie.log";
 
 //=== CLI arguments ===//

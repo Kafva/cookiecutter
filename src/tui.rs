@@ -19,7 +19,7 @@ use crossterm::{
 };
 
 use crate::{
-    config::DEBUG_LOG,
+    config::{DEBUG_LOG,NO_SELECTION},
     types::{CookieDB,Cookie}
 };
 
@@ -73,7 +73,7 @@ impl<T> StatefulList<T> {
 // Desired functionality:
 //  leveled list menu:
 //  [profile list] -> [domain list] -> [cookie list] -> [field list (view only)]
-//  Global key mappings: 
+//  Global key mappings:
 //  h/j/k/l : Movement
 //  D       : Delete current item, (Not valid at profile level)
 //
@@ -97,21 +97,21 @@ struct State<'a> {
 impl<'a> State<'a> {
     fn from_cookie_dbs(cookie_dbs: &Vec<CookieDB>) -> State {
         // Statefil list of profiles
-        let profiles = StatefulList::with_items( 
+        let profiles = StatefulList::with_items(
             cookie_dbs.iter().map(|c| c.path_short()).collect()
         );
         let mut domains = HashMap::new();
         let mut cookies = HashMap::new();
 
         for cdb in cookie_dbs {
-           let mut hst_names: Vec<&str> = 
+           let mut hst_names: Vec<&str> =
                cdb.cookies.iter().map(|c| c.host.as_str()).collect();
            hst_names.sort();
            hst_names.dedup();
 
            for hst_name in hst_names.as_slice() {
                 let cookies_for_hst = cdb.cookies.iter().filter(|c|
-                   c.host == **hst_name 
+                   c.host == **hst_name
                 ).collect();
 
                 // Statefil list of cookies (per domain, per profile)
@@ -123,7 +123,7 @@ impl<'a> State<'a> {
 
             // Statefil list of domains (per profile)
            domains.insert(
-              cdb.path_short(), 
+              cdb.path_short(),
               StatefulList::with_items(hst_names)
            );
         }
@@ -132,15 +132,80 @@ impl<'a> State<'a> {
             selected_split: 0, profiles, domains, cookies
         }
     }
+
+    // Determine the currently selected profile (if any)
+    fn selected_profile(&self) -> Option<usize> {
+        let selected: usize = self.profiles.state.selected()
+                .unwrap_or_else(|| NO_SELECTION);
+        if selected != NO_SELECTION {
+            Some(selected)
+        } else {
+           None
+        }
+    }
+
 }
 
 //============================================================================//
+//
+/// Handle keyboard input
+fn handle_key(code: KeyCode, state: &mut State) {
+    match code {
+        KeyCode::Left|KeyCode::Char('h') => {
+            state.profiles.unselect();
+            state.selected_split = if state.selected_split == 0
+                                   {0} else {state.selected_split-1}
+            // TODO call unselect() on the correct list
+        },
+        KeyCode::Down|KeyCode::Char('j') => {
+            state.profiles.next();
+            // TODO call next on the correct list
+        },
+        KeyCode::Up|KeyCode::Char('k') => {
+            state.profiles.previous();
+            // TODO call previous on the correct list
+        },
+        KeyCode::Right|KeyCode::Char('l') => {
+            if state.selected_split < 2 {
+               match state.selected_split {
+                   0 => {
+                      // Move to the next split
+                      state.selected_split+=1;
+
+                      // If there is a currently selected profile,
+                      // fetch the domains for this profile and select
+                      // the first entry
+                      let curr = state.selected_profile();
+                      if curr.is_some() {
+                          let selected_profile =
+                              state.profiles.items.get(curr.unwrap()).unwrap();
+
+                          let domains_for_profile =
+                              state.domains.get_mut(selected_profile).unwrap();
+
+                          // Select the domain
+                          domains_for_profile.state.select(Some(0));
+                      }
+                   },
+                   1 => {
+                      state.selected_split+=1;
+                      // Select the first item from the current
+                      // `cookies_for_domain`
+                   }
+                   _ => panic!("Invalid split selection")
+               }
+
+            }
+        },
+        _ => {  }
+    }
+}
 
 /// Entrypoint for the TUI
 pub fn run(cookie_dbs: &Vec<CookieDB>) -> Result<(),io::Error> {
     // Disable certain parts of the terminal's default behaviour
     //  https://docs.rs/crossterm/0.23.2/crossterm/terminal/index.html#raw-mode
-    enable_raw_mode()?; 
+    enable_raw_mode()?;
     let mut stdout = std::io::stdout();
 
     // Enter fullscreen (crossterm API)
@@ -192,25 +257,8 @@ fn run_ui<B: Backend>(
     }
 }
 
-/// Handle keyboard input
-fn handle_key(code: KeyCode, state: &mut State) {
-    match code {
-        KeyCode::Left|KeyCode::Char('h') => {
-            state.profiles.unselect();
-        },
-        KeyCode::Down|KeyCode::Char('j') => {
-            state.profiles.next();
-        },
-        KeyCode::Up|KeyCode::Char('k') => {
-            state.profiles.previous();
-        },
-        KeyCode::Right|KeyCode::Char('l') => { 
-            state.selected_split = if state.selected_split == 2 
-                                   {2} else {state.selected_split+1}
-        },
-        _ => {  }
-    }
-}
+
+
 
 /// Render the UI, called on each tick
 fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
@@ -218,45 +266,84 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-             Constraint::Percentage(33), 
+             Constraint::Percentage(33),
              Constraint::Percentage(33),
              Constraint::Percentage(33)
         ].as_ref()).split(frame.size());
 
 
-    // Profiles
+    //== Profiles ==//
     let profile_items: Vec<ListItem> = state.profiles.items.iter().map(|p| {
         ListItem::new(p.as_str()).style(Style::default())
     }).collect();
 
-    let profile_list = create_list(profile_items);
+    let profile_list = create_list(profile_items, String::from("Profiles"));
 
+    //== Render profiles ==//
     frame.render_stateful_widget(
         profile_list, chunks[0], &mut state.profiles.state
     );
 
+    // Determine the currently selected profile (if any)
+    let selected: usize = state.profiles.state.selected()
+            .unwrap_or_else(|| NO_SELECTION);
 
-    // Fetch the currently selected profile
-    let selected = state.profiles.state.selected().unwrap_or_default();
-    debug_log(selected);
+    if selected != NO_SELECTION {
+        //== Domains ==//
+        // Add the domains of the selected profile to the second chunk
+        let selected_profile = state.profiles.items.get(selected).unwrap();
 
+        // Note that `domains_for_profile` and `cookies_for_domain`
+        // need to mutably borrowed to support updatates in the frame
+        let domains_for_profile  = state.domains.get_mut(
+            selected_profile
+        ).unwrap();
 
-    // Domains
-    //let profile_items: Vec<ListItem> = state.domains[].iter().map(|p| {
-    //    ListItem::new(p.as_str()).style(Style::default())
-    //}).collect();
+        let domain_items: Vec<ListItem> = domains_for_profile
+            .items.iter().map(|p| {
+                ListItem::new(*p).style(Style::default())
+        }).collect();
 
-    //let profile_list = create_list(domain_items);
+        let domain_list = create_list(domain_items, String::from("Domains"));
 
-    //frame.render_stateful_widget(
-    //    profile_list, chunks[0], &mut state.profiles.state
-    //);
+        //== Cookies ==//
+        // Determine the currently selected domain
+        let selected: usize = domains_for_profile.state.selected()
+            .unwrap_or_else(|| NO_SELECTION);
+        if selected != NO_SELECTION {
+            let selected_domain = domains_for_profile.items
+                .get(selected).unwrap();
+
+            // Add the cookies of the selected domain to the third chunk
+            let cookies_for_domain  = state.cookies.get_mut(
+                &format!("{}{}", selected_profile, selected_domain)
+            ).unwrap();
+
+            let cookie_items: Vec<ListItem> = cookies_for_domain.items.iter()
+                .map(|c| {
+                    ListItem::new(c.name.as_str()).style(Style::default())
+            }).collect();
+
+            let cookie_list =
+                create_list(cookie_items, String::from("Cookies"));
+
+            //== Render cookies ==//
+            frame.render_stateful_widget(
+                cookie_list, chunks[2], &mut cookies_for_domain.state
+            );
+        }
+
+        //== Render domains ==//
+        frame.render_stateful_widget(
+            domain_list, chunks[1], &mut domains_for_profile.state
+        );
+    }
 }
 
-fn create_list(items: Vec<ListItem>) -> List {
+fn create_list(items: Vec<ListItem>, title: String) -> List {
     List::new(items)
         .block(Block::default().borders(Borders::RIGHT)
-        .title("tmp"))
+        .title(title))
         .highlight_style(
             Style::default()
                 .bg(Color::LightGreen)
@@ -267,14 +354,14 @@ fn create_list(items: Vec<ListItem>) -> List {
 }
 
 /// Print a debug message to `DEBUG_LOG`
-fn debug_log<T: std::fmt::Display>(msg: T) -> Result<(),io::Error> {
+#[allow(dead_code)]
+fn debug_log<T: std::fmt::Display>(msg: T) {
     let mut f = OpenOptions::new()
         .create(true)
         .append(true)
         .open(DEBUG_LOG)
         .unwrap();
 
-    writeln!(f,"-> {msg}")?;
-    Ok(())
+    writeln!(f,"-> {msg}").expect("Failed to write debug message");
 }
 
