@@ -8,6 +8,7 @@ use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
+    text::Span,
     widgets::{Block, Borders, List, ListItem},
     Frame, Terminal,
 };
@@ -18,7 +19,11 @@ use crossterm::{
 };
 
 use crate::{
-    config::{DEBUG_LOG,INVALID_SPLIT_ERR,TUI_SELECTED_ROW,NO_SELECTION},
+    config::{
+        DEBUG_LOG,INVALID_SPLIT_ERR,
+        TUI_SELECTED_ROW,NO_SELECTION,
+        TUI_PRIMARY_COLOR
+    },
     cookie_db::CookieDB,
     state::State
 };
@@ -149,7 +154,6 @@ fn handle_key(code: KeyCode, state: &mut State) {
                2 => {
                     // The `state.current_fields.items` array is empty
                     // until the next ui() tick.
-                    // state.selected_split+=1;
                }
                _ => panic!("{}", INVALID_SPLIT_ERR)
            }
@@ -158,9 +162,8 @@ fn handle_key(code: KeyCode, state: &mut State) {
     }
 }
 
-/// Render the UI, called on each tick
-///
-/// Lists will be displayed at different indices depending on if
+/// Render the UI, called on each tick.
+/// Lists will be displayed at different indices depending on
 /// which of the two views are active:
 ///  View 1: (selected 0-1)
 ///  View 2: (selected: 2)
@@ -176,7 +179,8 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
              Constraint::Percentage(33),
              Constraint::Percentage(33),
              Constraint::Percentage(33)
-        ].as_ref()).split(frame.size());
+        ].as_ref())
+        .split(frame.size());
 
     let (profiles_idx, domains_idx, cookies_idx, fields_idx) = 
         if state.selected_split < 2 {
@@ -191,7 +195,9 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
             ListItem::new(p.as_str()).style(Style::default())
         }).collect();
 
-        let profile_list = create_list(profile_items, String::from("Profiles"));
+        let profile_list = create_list(
+            profile_items, String::from("Profiles"), Borders::RIGHT
+        );
 
         //== Render profiles ==//
         frame.render_stateful_widget(
@@ -210,7 +216,7 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
                     ListItem::new(p.to_owned()).style(Style::default())
             }).collect();
             let domain_list = create_list(
-                domain_items, String::from("Domains")
+                domain_items, String::from("Domains"), Borders::RIGHT
             );
 
             //== Render domains ==//
@@ -231,7 +237,12 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
                         ListItem::new(*c).style(Style::default())
                 }).collect();
                 let cookies_list = 
-                    create_list(cookies_items, String::from("Cookies"));
+                    create_list(cookies_items, 
+                                String::from("Cookies"),
+                                if fields_idx != NO_SELECTION 
+                                { Borders::RIGHT } else
+                                { Borders::NONE }
+                    );
 
                 //== Render cookies ==//
                 frame.render_stateful_widget(
@@ -267,7 +278,13 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 
                         let fields_list = List::new(fields_items)
                                 .block(Block::default()
-                                .title("Fields"));
+                                .title(Span::styled("Fields", 
+                                    Style::default()
+                                    .fg(Color::Indexed(TUI_PRIMARY_COLOR))
+                                        .add_modifier(Modifier::UNDERLINED)
+                                    )
+                                )
+                            );
 
                         if fields_idx != NO_SELECTION {
                             //== Render fields ==//
@@ -287,14 +304,19 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 }
 
 /// Create a TUI `List` from a `ListItem` vector
-fn create_list(items: Vec<ListItem>, title: String) -> List {
+fn create_list(items: Vec<ListItem>, title: String, border: Borders) -> List {
     List::new(items)
-        .block(Block::default().borders(Borders::RIGHT)
-        .title(title))
+        .block(
+            Block::default().borders(border)
+            .title(Span::styled(title, 
+                    Style::default().fg(Color::Indexed(TUI_PRIMARY_COLOR))
+                        .add_modifier(Modifier::UNDERLINED)
+                )
+            )
+        )
         .highlight_style(
             Style::default()
-                .bg(Color::LightGreen)
-                .fg(Color::Black)
+                .fg(Color::Indexed(TUI_PRIMARY_COLOR))
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol(TUI_SELECTED_ROW)

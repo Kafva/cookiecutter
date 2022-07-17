@@ -7,18 +7,11 @@ pub struct StatefulList<T> {
     pub items: Vec<T>,
 }
 
+/// https://github.com/fdehau/tui-rs/tree/master/examples/list.rs
 impl<T> StatefulList<T> {
     pub fn default() -> Self {
         StatefulList { status: ListState::default(), items: vec![] }
     }
-
-    pub fn with_items(items: Vec<T>) -> StatefulList<T> {
-        StatefulList {
-            status: ListState::default(),
-            items,
-        }
-    }
-
     pub fn next(&mut self) {
         let i = match self.status.selected() {
             Some(i) => {
@@ -32,7 +25,6 @@ impl<T> StatefulList<T> {
         };
         self.status.select(Some(i));
     }
-
     pub fn previous(&mut self) {
         let i = match self.status.selected() {
             Some(i) => {
@@ -51,7 +43,8 @@ impl<T> StatefulList<T> {
 
 /// The main struct which holds the global state of the TUI
 pub struct State<'a> {
-    pub selected_split: u32, // 0 - 3
+    /// Valid range: 0 - 2
+    pub selected_split: u8, 
 
     // We we only keep the domains for the currently seleceted profile
     // in a StatefulList. If a domain is removed, we will update the
@@ -68,12 +61,12 @@ impl<'a> State<'a> {
     /// Create a TUI state object from a vector of cookie databases
     pub fn from_cookie_dbs(cookie_dbs: &Vec<CookieDB>) -> State {
         // The profiles list will never change after launch
-        let profiles = StatefulList::with_items(
-
-            cookie_dbs.iter().map(|c| {
+        let profiles = StatefulList {
+            status: ListState::default(),
+            items: cookie_dbs.iter().map(|c| {
                 c.path_short()
             }).collect()
-        );
+        };
         State {
             selected_split: 0, 
             profiles, 

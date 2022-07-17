@@ -47,6 +47,7 @@ pub const NO_SELECTION: usize = 9999999;
 pub const INVALID_SPLIT_ERR: &'static str = "Invalid split selection";
 pub const DEBUG_LOG: &'static str = "rokie.log";
 pub const TUI_SELECTED_ROW: &'static str = ">> ";
+pub const TUI_PRIMARY_COLOR: u8 = 111;
 
 //=== CLI arguments ===//
 #[derive(Debug,Subcommand)]
