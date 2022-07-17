@@ -180,8 +180,14 @@ impl CookieDB {
     }
 
     /// List of cookies for a specific domain
-    pub fn cookies_for_domain(&self, domain: &str) -> Vec<&Cookie> {
-         self.cookies.iter().filter(|c| c.host == domain).collect()
+    pub fn cookies_for_domain(&self, domain: &String) -> Vec<&Cookie> {
+         self.cookies.iter().filter(|c| c.host == *domain).collect()
+    }
+
+    /// Return a cookie with a specific name from a specific domain
+    pub fn cookie_for_domain(&self, name: &String, domain: &String) 
+     -> Option<&Cookie> {
+         self.cookies.iter().find(|c| c.host == *domain && c.name == *name)
     }
 
 }

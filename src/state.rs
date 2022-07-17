@@ -1,12 +1,6 @@
-use std::collections::HashMap;
-
 use tui::widgets::ListState;
 
-use crate::{
-    config::NO_SELECTION,
-    cookie_db::CookieDB,
-    cookie::Cookie
-};
+use crate::cookie_db::CookieDB;
 
 pub struct StatefulList<T> {
     pub status: ListState,
@@ -54,18 +48,6 @@ impl<T> StatefulList<T> {
     }
 }
 
-// Desired functionality:
-//  leveled list menu:
-//  [profile list] -> [domain list] -> [cookie list] -> [field list (view only)]
-//  Global key mappings:
-//  h/j/k/l : Movement
-//  D       : Delete current item, (Not valid at profile level)
-//
-//  View 1:
-//  |profiles|domains|cookie names|
-//
-//  View 2:
-//  |domains|cookie names|field list|
 
 /// The main struct which holds the global state of the TUI
 pub struct State<'a> {
@@ -85,8 +67,7 @@ pub struct State<'a> {
 impl<'a> State<'a> {
     /// Create a TUI state object from a vector of cookie databases
     pub fn from_cookie_dbs(cookie_dbs: &Vec<CookieDB>) -> State {
-
-        // The profiles list will never change
+        // The profiles list will never change after launch
         let profiles = StatefulList::with_items(
 
             cookie_dbs.iter().map(|c| {
@@ -103,14 +84,25 @@ impl<'a> State<'a> {
         }
     }
 
-
     /// The currently selected domain (if any)
-    pub fn selected_domain(&self) -> Option<&&str> {
+    pub fn selected_domain(&self) -> Option<String> {
         if let Some(selected_idx) = self.current_domains.status.selected() {
-            self.current_domains.items.get(selected_idx)
+            // Convert to String to dodge BC
+            Some(String::from(*self.current_domains.items.get(selected_idx).unwrap()))
         } else {
             None
         }
     }
+
+    /// The currently selected cookie (if any)
+    pub fn selected_cookie(&self) -> Option<String> {
+        if let Some(selected_idx) = self.current_cookies.status.selected() {
+            // Convert to String to dodge BC
+            Some(String::from(*self.current_cookies.items.get(selected_idx).unwrap()))
+        } else {
+            None
+        }
+    }
+
 }
 

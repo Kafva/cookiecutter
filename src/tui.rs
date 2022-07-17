@@ -94,11 +94,12 @@ fn handle_key(code: KeyCode, state: &mut State) {
                     state.selected_split-=1;
                 }
                 2 => {
-                  //let cks = state.cookies_for_domain();
-                  //if let Some(cks) = cks {
-                  //    cks.state.select(None);
-                  //    state.selected_split -= 1
-                  //}
+                    state.current_cookies.status.select(None);
+                    state.selected_split-=1;
+                }
+                3 => {
+                    state.current_fields.status.select(None);
+                    state.selected_split-=1;
                 }
                _ => panic!("{}", INVALID_SPLIT_ERR)
             }
@@ -111,15 +112,11 @@ fn handle_key(code: KeyCode, state: &mut State) {
                 1 => {
                   state.current_domains.next()
                 }
-                2 => {
-                  //let cks = state.cookies_for_domain();
-                  //if let Some(cks) = cks {
-                  //    cks.next()
-                  //}
+                2|3 => {
+                  // Cycle through cookies when the field
+                  // window is selected
+                  state.current_cookies.next()
                 },
-                3 => {
-
-                }
                _ => panic!("{}", INVALID_SPLIT_ERR)
             }
         },
@@ -129,38 +126,38 @@ fn handle_key(code: KeyCode, state: &mut State) {
                 0 => { state.profiles.previous() }
                 1 => {
                     state.current_domains.previous()
-
                 }
-                2 => {
-                  //let cks = state.cookies_for_domain();
-                  //if let Some(cks) = cks {
-                  //    cks.previous()
-                  //}
+                2|3 => {
+                    // Cycle through cookies when the field
+                    // window is selected
+                    state.current_cookies.previous()
                 }
                _ => panic!("{}", INVALID_SPLIT_ERR)
             }
         },
         //== Select the next split ==//
         KeyCode::Right|KeyCode::Char('l') => {
-            if state.selected_split < 2 {
-               match state.selected_split {
-                   0 => {
-                        if state.current_domains.items.len() > 0 {
-                            state.current_domains.status.select(Some(0));
-                            state.selected_split+=1;
-                        }
-                   },
-                   1 => {
-                      //let cks = state.cookies_for_domain();
-                      //if let Some(cks) = cks && cks.items.len() > 0 {
-                      //    cks.state.select(Some(0));
-                      //    state.selected_split+=1;
-                      //}
-                   }
-                   _ => panic!("{}", INVALID_SPLIT_ERR)
+           match state.selected_split {
+               0 => {
+                    if state.current_domains.items.len() > 0 {
+                        state.current_domains.status.select(Some(0));
+                        state.selected_split+=1;
+                    }
+               },
+               1 => {
+                    if state.current_cookies.items.len() > 0 {
+                        state.current_cookies.status.select(Some(0));
+                        state.selected_split+=1;
+                    }
                }
-
-            }
+               2 => {
+                    // TODO: this array is empty until the next ui() tick
+                    //if state.current_fields.items.len() > 0 {
+                        state.selected_split+=1;
+                    //}
+               }
+               _ => panic!("{}", INVALID_SPLIT_ERR)
+           }
         },
         _ => {  }
     }
@@ -230,7 +227,7 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
             if let Some(current_domain) = state.selected_domain() {
                 // Fill the current_cookies state list
                 state.current_cookies.items = 
-                    cdb.cookies_for_domain(*current_domain).iter()
+                    cdb.cookies_for_domain(&current_domain).iter()
                         .map(|c| c.name.as_str() ).collect();
 
                 // Create list items for the UI
@@ -245,68 +242,53 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
                     cookies_list, chunks[cookies_idx], 
                     &mut state.current_cookies.status
                 );
+
+                //== Fields ==//
+                if let Some(current_cookie) = state.selected_cookie() {
+                    if let Some(cookie) = cdb
+                        .cookie_for_domain(
+                            &current_cookie,&current_domain
+                        ) {
+
+                        //let all_fields = String::from(ALL_FIELDS);
+                        //let fmt_fields = cookie.fields_as_str(
+                        //   &all_fields,
+                        //   true,
+                        //   false
+                        //);
+                        debug_log(fields_idx);
+
+                        // Fill the current_fields state list
+                        state.current_fields.items = vec![
+                            &cookie.host,&cookie.path,&cookie.value
+                        ];
+                        //fmt_fields.split("\n").collect();
+
+                        // Create list items for the UI
+                        let fields_items = state.current_fields.items
+                            .iter().map(|f| {
+                                ListItem::new(*f).style(Style::default())
+                        }).collect();
+                        let fields_list = 
+                            create_list(fields_items, String::from("Fields")
+                        );
+
+
+                        if fields_idx != NO_SELECTION {
+                            //== Render fields ==//
+                            frame.render_stateful_widget(
+                                fields_list, chunks[fields_idx], 
+                                &mut state.current_fields.status
+                            );
+                            if state.current_fields.items.len() > 0 {
+                                state.current_fields.status.select(Some(0));
+                            }
+                        }
+                    }
+                }
             }
         }
     }
-
-
-    
-
-    ////== Domains ==//
-    //if let Some(domains) = state.domains_for_profile() {
-    //    let domain_items: Vec<ListItem> = domains
-    //        .items.iter().map(|p| {
-    //            ListItem::new(*p).style(Style::default())
-    //    }).collect();
-
-    //    let domain_list = create_list(domain_items, String::from("Domains"));
-
-    //    //== Render domains ==//
-    //    frame.render_stateful_widget(
-    //        domain_list, chunks[domains_idx], &mut domains.state
-    //    );
-
-    //    //== Cookies ==//
-    //    if let Some(cookies) = state.cookies_for_domain() {
-    //        let cookies_items: Vec<ListItem> = cookies.items.iter()
-    //            .map(|c| {
-    //                ListItem::new(c.name.as_str()).style(Style::default())
-    //        }).collect();
-
-    //        let cookies_list =
-    //            create_list(cookies_items, String::from("Cookies"));
-
-    //        //== Render cookies ==//
-    //        frame.render_stateful_widget(
-    //            cookies_list, chunks[cookies_idx], &mut cookies.state
-    //        );
-
-    //        //== Fields ==//
-    //        //if let Some(current_cookie) = state.fields_for_cookie() {
-
-    //        //    let fields_items = current_cookie.as_list_items();
-
-    //        //    let fields_list =
-    //        //        create_list(fields_items, String::from("Fields"));
-
-    //        //    let tmp = current_cookie
-    //        //            .fields_as_str(
-    //        //                &String::from(ALL_FIELDS),
-    //        //                true,
-    //        //                false
-    //        //            ).split("\n");
-
-    //        //    state.current_fields.items = tmp.collect();
-
-    //        //    //== Render fields ==//
-    //        //    frame.render_stateful_widget(
-    //        //        fields_list, chunks[fields_idx], &mut state.current_fields.state
-    //        //    );
-
-    //        //}
-    //    }
-
-    //}
 }
 
 /// Create a TUI `List` from a `ListItem` vector

@@ -1,7 +1,6 @@
 use std::fmt;
 
 use chrono::{TimeZone,Utc};
-use tui::{widgets::ListItem, style::Style};
 
 use crate::{COOKIE_FIELDS,ALL_FIELDS};
 use crate::config::ENCRYPTED_VALUE;
@@ -133,14 +132,6 @@ impl Cookie {
             };
         }
         output + &value.to_string()
-    }
-
-    /// Create a `ListItem` vector with one item for each field of the cookie
-    pub fn as_list_items(&self) -> Vec<ListItem> {
-        self.fields_as_str(&String::from(ALL_FIELDS), true, false).split("\n")
-            .map(|f|{
-                ListItem::new(f.to_owned()).style(Style::default()) 
-        }).collect()
     }
 }
 
