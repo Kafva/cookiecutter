@@ -178,6 +178,12 @@ impl CookieDB {
         hst_names.dedup();
         hst_names
     }
+
+    /// List of cookies for a specific domain
+    pub fn cookies_for_domain(&self, domain: &str) -> Vec<&Cookie> {
+         self.cookies.iter().filter(|c| c.host == domain).collect()
+    }
+
 }
 
 #[cfg(test)]

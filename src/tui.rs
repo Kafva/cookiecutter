@@ -209,7 +209,6 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
     //== Domains ==//
     if let Some(profile_idx) = state.profiles.status.selected() {
         if let Some(cdb) = state.cookie_dbs.get(profile_idx) {
-
             // Fill the current_domains state list
             state.current_domains.items = cdb.domains();
 
@@ -226,6 +225,27 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
                 domain_list, chunks[domains_idx], 
                 &mut state.current_domains.status
             );
+
+            //== Cookies ==//
+            if let Some(current_domain) = state.selected_domain() {
+                // Fill the current_cookies state list
+                state.current_cookies.items = 
+                    cdb.cookies_for_domain(*current_domain).iter()
+                        .map(|c| c.name.as_str() ).collect();
+
+                // Create list items for the UI
+                let cookies_items = state.current_cookies.items.iter().map(|c| {
+                        ListItem::new(*c).style(Style::default())
+                }).collect();
+                let cookies_list = 
+                    create_list(cookies_items, String::from("Cookies"));
+
+                //== Render cookies ==//
+                frame.render_stateful_widget(
+                    cookies_list, chunks[cookies_idx], 
+                    &mut state.current_cookies.status
+                );
+            }
         }
     }
 
