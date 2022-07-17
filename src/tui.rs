@@ -7,9 +7,9 @@ use std::{
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
     text::Span,
-    widgets::{Block, Borders, List, ListItem},
+    style::{Color, Modifier, Style},
+    widgets::{Block, Borders, List, ListItem, Cell, Row, Table, BorderType},
     Frame, Terminal,
 };
 use crossterm::{
@@ -21,7 +21,7 @@ use crossterm::{
 use crate::{
     config::{
         DEBUG_LOG,INVALID_SPLIT_ERR,
-        TUI_SELECTED_ROW,NO_SELECTION,
+        NO_SELECTION,
         TUI_PRIMARY_COLOR
     },
     cookie_db::CookieDB,
@@ -172,16 +172,51 @@ fn handle_key(code: KeyCode, state: &mut State) {
 ///  |profiles|domains|cookie names|field_list|
 ///
 fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
-    // Create two chunks with equal horizontal screen space
+
+    // Split the frame vertically into a body and footer
+    let vert_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(98), 
+            Constraint::Percentage(2)]
+        .as_ref())
+        .split(frame.size());
+
+
+    // Create three chunks for the body
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
+        .margin(1)
         .constraints([
              Constraint::Percentage(33),
              Constraint::Percentage(33),
              Constraint::Percentage(33)
         ].as_ref())
-        .split(frame.size());
+        .split(vert_chunks[0]);
 
+    // Create the footer with usage strings
+    let cells = [
+        Cell::from("/: Search")
+            .style(Style::default().fg(Color::LightBlue)),
+        Cell::from("D: Delete")
+            .style(Style::default().fg(Color::LightRed)),
+        Cell::from("C: Copy")
+            .style(Style::default().fg(Color::LightYellow))
+    ];
+
+    let row = Row::new(cells).bottom_margin(1);
+    let usage = Table::new(vec![row])
+        .block(Block::default().borders(Borders::NONE))
+        .widths(&[
+            Constraint::Percentage(7),
+            Constraint::Percentage(7),
+            Constraint::Percentage(7),
+        ]);
+
+    //== Render the footer ==//
+    frame.render_widget(usage, vert_chunks[1]);
+
+    // Determine which splits should be rendered
     let (profiles_idx, domains_idx, cookies_idx, fields_idx) = 
         if state.selected_split < 2 {
             (0,1,2,NO_SELECTION)
@@ -196,7 +231,7 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
         }).collect();
 
         let profile_list = create_list(
-            profile_items, String::from("Profiles"), Borders::RIGHT
+            profile_items, String::from("Profiles"), Borders::NONE
         );
 
         //== Render profiles ==//
@@ -216,7 +251,7 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
                     ListItem::new(p.to_owned()).style(Style::default())
             }).collect();
             let domain_list = create_list(
-                domain_items, String::from("Domains"), Borders::RIGHT
+                domain_items, String::from("Domains"), Borders::NONE
             );
 
             //== Render domains ==//
@@ -239,9 +274,7 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
                 let cookies_list = 
                     create_list(cookies_items, 
                                 String::from("Cookies"),
-                                if fields_idx != NO_SELECTION 
-                                { Borders::RIGHT } else
-                                { Borders::NONE }
+                                Borders::NONE
                     );
 
                 //== Render cookies ==//
@@ -278,6 +311,8 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 
                         let fields_list = List::new(fields_items)
                                 .block(Block::default()
+                                .border_type(BorderType::Rounded)
+                                .borders(Borders::ALL)
                                 .title(Span::styled("Fields", 
                                     Style::default()
                                     .fg(Color::Indexed(TUI_PRIMARY_COLOR))
@@ -307,10 +342,11 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 fn create_list(items: Vec<ListItem>, title: String, border: Borders) -> List {
     List::new(items)
         .block(
-            Block::default().borders(border)
+            Block::default().border_type(BorderType::Rounded).borders(border)
             .title(Span::styled(title, 
                     Style::default().fg(Color::Indexed(TUI_PRIMARY_COLOR))
                         .add_modifier(Modifier::UNDERLINED)
+                        .add_modifier(Modifier::BOLD),
                 )
             )
         )
@@ -319,7 +355,6 @@ fn create_list(items: Vec<ListItem>, title: String, border: Borders) -> List {
                 .fg(Color::Indexed(TUI_PRIMARY_COLOR))
                 .add_modifier(Modifier::BOLD),
         )
-        .highlight_symbol(TUI_SELECTED_ROW)
 }
 
 /// Print a debug message to `DEBUG_LOG`
