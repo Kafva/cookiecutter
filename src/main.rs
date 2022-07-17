@@ -1,8 +1,3 @@
-// https://github.com/rust-lang/rust/issues/53667
-// Allows for conditional checks upon Some() results:
-//      `if let Some(x) = y && x.len() > 0`
-#![feature(let_chains)]
-
 use std::collections::HashSet;
 use std::path;
 

@@ -168,6 +168,16 @@ impl CookieDB {
         }
         Ok(())
     }
+
+
+    /// Deduplicated list of domains stored in the database
+    pub fn domains(&self) -> Vec<&str> {
+        let mut hst_names: Vec<&str> =
+            self.cookies.iter().map(|c| c.host.as_str()).collect();
+        hst_names.sort();
+        hst_names.dedup();
+        hst_names
+    }
 }
 
 #[cfg(test)]

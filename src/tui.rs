@@ -36,7 +36,7 @@ pub fn run(cookie_dbs: &Vec<CookieDB>) -> Result<(),io::Error> {
 
     let mut terminal = Terminal::new(backend)?;
     let tick_rate = Duration::from_millis(250);
-    let mut state = State::from_cookie_dbs(&cookie_dbs);
+    let mut state = State::from_cookie_dbs(cookie_dbs);
 
     run_ui(&mut terminal, &mut state, tick_rate).unwrap();
 
@@ -56,8 +56,10 @@ fn run_ui<B: Backend>(term: &mut Terminal<B>, state: &mut State,
  tick_rate: Duration) -> io::Result<()> {
     let mut last_tick = Instant::now();
 
-    // Auto-select the first profile: TODO handle no-profiles
-    state.profiles.state.select(Some(0));
+    // Auto-select the first profile
+    if state.profiles.items.len() > 0 {
+        state.profiles.status.select(Some(0));
+    }
 
     loop {
         term.draw(|f| ui(f,state))?;
@@ -88,18 +90,15 @@ fn handle_key(code: KeyCode, state: &mut State) {
             match state.selected_split {
                 0 => {  }
                 1 => {
-                  let dms = state.domains_for_profile();
-                  if let Some(dms) = dms {
-                      dms.state.select(None);
-                      state.selected_split -= 1
-                  }
+                    state.current_domains.status.select(None);
+                    state.selected_split-=1;
                 }
                 2 => {
-                  let cks = state.cookies_for_domain();
-                  if let Some(cks) = cks {
-                      cks.state.select(None);
-                      state.selected_split -= 1
-                  }
+                  //let cks = state.cookies_for_domain();
+                  //if let Some(cks) = cks {
+                  //    cks.state.select(None);
+                  //    state.selected_split -= 1
+                  //}
                 }
                _ => panic!("{}", INVALID_SPLIT_ERR)
             }
@@ -110,16 +109,13 @@ fn handle_key(code: KeyCode, state: &mut State) {
             match state.selected_split {
                 0 => { state.profiles.next() }
                 1 => {
-                  let dms = state.domains_for_profile();
-                  if let Some(dms) = dms {
-                      dms.next();
-                  }
+                  state.current_domains.next()
                 }
                 2 => {
-                  let cks = state.cookies_for_domain();
-                  if let Some(cks) = cks {
-                      cks.next()
-                  }
+                  //let cks = state.cookies_for_domain();
+                  //if let Some(cks) = cks {
+                  //    cks.next()
+                  //}
                 },
                 3 => {
 
@@ -132,16 +128,14 @@ fn handle_key(code: KeyCode, state: &mut State) {
             match state.selected_split {
                 0 => { state.profiles.previous() }
                 1 => {
-                  let dms = state.domains_for_profile();
-                  if let Some(dms) = dms {
-                      dms.previous();
-                  }
+                    state.current_domains.previous()
+
                 }
                 2 => {
-                  let cks = state.cookies_for_domain();
-                  if let Some(cks) = cks {
-                      cks.previous()
-                  }
+                  //let cks = state.cookies_for_domain();
+                  //if let Some(cks) = cks {
+                  //    cks.previous()
+                  //}
                 }
                _ => panic!("{}", INVALID_SPLIT_ERR)
             }
@@ -149,23 +143,19 @@ fn handle_key(code: KeyCode, state: &mut State) {
         //== Select the next split ==//
         KeyCode::Right|KeyCode::Char('l') => {
             if state.selected_split < 2 {
-               // if_let chaining is used to ensure
-               // that the next split has at least one item
-               // before switching
                match state.selected_split {
                    0 => {
-                      let dms = state.domains_for_profile();
-                      if let Some(dms) = dms && dms.items.len() > 0 {
-                          dms.state.select(Some(0));
-                          state.selected_split+=1;
-                      }
+                        if state.current_domains.items.len() > 0 {
+                            state.current_domains.status.select(Some(0));
+                            state.selected_split+=1;
+                        }
                    },
                    1 => {
-                      let cks = state.cookies_for_domain();
-                      if let Some(cks) = cks && cks.items.len() > 0 {
-                          cks.state.select(Some(0));
-                          state.selected_split+=1;
-                      }
+                      //let cks = state.cookies_for_domain();
+                      //if let Some(cks) = cks && cks.items.len() > 0 {
+                      //    cks.state.select(Some(0));
+                      //    state.selected_split+=1;
+                      //}
                    }
                    _ => panic!("{}", INVALID_SPLIT_ERR)
                }
@@ -212,65 +202,91 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 
         //== Render profiles ==//
         frame.render_stateful_widget(
-            profile_list, chunks[profiles_idx], &mut state.profiles.state
+            profile_list, chunks[profiles_idx], &mut state.profiles.status
         );
     }
 
     //== Domains ==//
-    if let Some(domains) = state.domains_for_profile() {
-        let domain_items: Vec<ListItem> = domains
-            .items.iter().map(|p| {
-                ListItem::new(*p).style(Style::default())
-        }).collect();
+    if let Some(profile_idx) = state.profiles.status.selected() {
+        if let Some(cdb) = state.cookie_dbs.get(profile_idx) {
 
-        let domain_list = create_list(domain_items, String::from("Domains"));
+            // Fill the current_domains state list
+            state.current_domains.items = cdb.domains();
 
-        //== Render domains ==//
-        frame.render_stateful_widget(
-            domain_list, chunks[domains_idx], &mut domains.state
-        );
-
-        //== Cookies ==//
-        if let Some(cookies) = state.cookies_for_domain() {
-            let cookies_items: Vec<ListItem> = cookies.items.iter()
-                .map(|c| {
-                    ListItem::new(c.name.as_str()).style(Style::default())
+            // Create list items for the UI
+            let domain_items: Vec<ListItem> = cdb.domains().iter().map(|p| {
+                    ListItem::new(p.to_owned()).style(Style::default())
             }).collect();
-
-            let cookies_list =
-                create_list(cookies_items, String::from("Cookies"));
-
-            //== Render cookies ==//
-            frame.render_stateful_widget(
-                cookies_list, chunks[cookies_idx], &mut cookies.state
+            let domain_list = create_list(
+                domain_items, String::from("Domains")
             );
 
-            //== Fields ==//
-            //if let Some(current_cookie) = state.fields_for_cookie() {
-
-            //    let fields_items = current_cookie.as_list_items();
-
-            //    let fields_list =
-            //        create_list(fields_items, String::from("Fields"));
-
-            //    let tmp = current_cookie
-            //            .fields_as_str(
-            //                &String::from(ALL_FIELDS),
-            //                true,
-            //                false
-            //            ).split("\n");
-
-            //    state.current_fields.items = tmp.collect();
-
-            //    //== Render fields ==//
-            //    frame.render_stateful_widget(
-            //        fields_list, chunks[fields_idx], &mut state.current_fields.state
-            //    );
-
-            //}
+            //== Render domains ==//
+            frame.render_stateful_widget(
+                domain_list, chunks[domains_idx], 
+                &mut state.current_domains.status
+            );
         }
-
     }
+
+
+    
+
+    ////== Domains ==//
+    //if let Some(domains) = state.domains_for_profile() {
+    //    let domain_items: Vec<ListItem> = domains
+    //        .items.iter().map(|p| {
+    //            ListItem::new(*p).style(Style::default())
+    //    }).collect();
+
+    //    let domain_list = create_list(domain_items, String::from("Domains"));
+
+    //    //== Render domains ==//
+    //    frame.render_stateful_widget(
+    //        domain_list, chunks[domains_idx], &mut domains.state
+    //    );
+
+    //    //== Cookies ==//
+    //    if let Some(cookies) = state.cookies_for_domain() {
+    //        let cookies_items: Vec<ListItem> = cookies.items.iter()
+    //            .map(|c| {
+    //                ListItem::new(c.name.as_str()).style(Style::default())
+    //        }).collect();
+
+    //        let cookies_list =
+    //            create_list(cookies_items, String::from("Cookies"));
+
+    //        //== Render cookies ==//
+    //        frame.render_stateful_widget(
+    //            cookies_list, chunks[cookies_idx], &mut cookies.state
+    //        );
+
+    //        //== Fields ==//
+    //        //if let Some(current_cookie) = state.fields_for_cookie() {
+
+    //        //    let fields_items = current_cookie.as_list_items();
+
+    //        //    let fields_list =
+    //        //        create_list(fields_items, String::from("Fields"));
+
+    //        //    let tmp = current_cookie
+    //        //            .fields_as_str(
+    //        //                &String::from(ALL_FIELDS),
+    //        //                true,
+    //        //                false
+    //        //            ).split("\n");
+
+    //        //    state.current_fields.items = tmp.collect();
+
+    //        //    //== Render fields ==//
+    //        //    frame.render_stateful_widget(
+    //        //        fields_list, chunks[fields_idx], &mut state.current_fields.state
+    //        //    );
+
+    //        //}
+    //    }
+
+    //}
 }
 
 /// Create a TUI `List` from a `ListItem` vector
