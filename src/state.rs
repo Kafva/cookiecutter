@@ -61,7 +61,7 @@ pub struct State<'a> {
     pub profiles:        StatefulList<String>,
     pub current_domains: StatefulList<&'a str>,
     pub current_cookies: StatefulList<&'a str>,
-    pub current_fields:  StatefulList<&'a str>
+    pub current_fields:  StatefulList<String>
 }
 
 impl<'a> State<'a> {

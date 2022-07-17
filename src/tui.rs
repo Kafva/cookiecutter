@@ -18,7 +18,7 @@ use crossterm::{
 };
 
 use crate::{
-    config::{DEBUG_LOG,INVALID_SPLIT_ERR,TUI_SELECTED_ROW,NO_SELECTION,ALL_FIELDS},
+    config::{DEBUG_LOG,INVALID_SPLIT_ERR,TUI_SELECTED_ROW,NO_SELECTION},
     cookie_db::CookieDB,
     state::State
 };
@@ -97,10 +97,6 @@ fn handle_key(code: KeyCode, state: &mut State) {
                     state.current_cookies.status.select(None);
                     state.selected_split-=1;
                 }
-                3 => {
-                    state.current_fields.status.select(None);
-                    state.selected_split-=1;
-                }
                _ => panic!("{}", INVALID_SPLIT_ERR)
             }
 
@@ -151,10 +147,9 @@ fn handle_key(code: KeyCode, state: &mut State) {
                     }
                }
                2 => {
-                    // TODO: this array is empty until the next ui() tick
-                    //if state.current_fields.items.len() > 0 {
-                        state.selected_split+=1;
-                    //}
+                    // The `state.current_fields.items` array is empty
+                    // until the next ui() tick.
+                    // state.selected_split+=1;
                }
                _ => panic!("{}", INVALID_SPLIT_ERR)
            }
@@ -164,6 +159,15 @@ fn handle_key(code: KeyCode, state: &mut State) {
 }
 
 /// Render the UI, called on each tick
+///
+/// Lists will be displayed at different indices depending on if
+/// which of the two views are active:
+///  View 1: (selected 0-1)
+///  View 2: (selected: 2)
+///
+///  |0       |1      |2           |3         |
+///  |profiles|domains|cookie names|field_list|
+///
 fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
     // Create two chunks with equal horizontal screen space
     let chunks = Layout::default()
@@ -174,16 +178,8 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
              Constraint::Percentage(33)
         ].as_ref()).split(frame.size());
 
-
-    // Lists will be displayed at different indices depending on if
-    // which of the two views are active:
-    //  View 1:
-    //  |profiles|domains|cookie names|
-    //
-    //  View 2:
-    //  |domains|cookie names|field list|
     let (profiles_idx, domains_idx, cookies_idx, fields_idx) = 
-        if state.selected_split < 3 {
+        if state.selected_split < 2 {
             (0,1,2,NO_SELECTION)
         } else {
             (NO_SELECTION,0,1,2)
@@ -250,29 +246,28 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
                             &current_cookie,&current_domain
                         ) {
 
-                        //let all_fields = String::from(ALL_FIELDS);
-                        //let fmt_fields = cookie.fields_as_str(
-                        //   &all_fields,
-                        //   true,
-                        //   false
-                        //);
-                        debug_log(fields_idx);
-
                         // Fill the current_fields state list
                         state.current_fields.items = vec![
-                            &cookie.host,&cookie.path,&cookie.value
+                            cookie.match_field("Value",true,false),
+                            cookie.match_field("Path",true,false),
+                            cookie.match_field("Creation",true,false),
+                            cookie.match_field("Expiry",true,false),
+                            cookie.match_field("LastAccess",true,false),
+                            cookie.match_field("HttpOnly",true,false),
+                            cookie.match_field("Secure",true,false),
+                            cookie.match_field("SameSite",true,false),
                         ];
-                        //fmt_fields.split("\n").collect();
 
                         // Create list items for the UI
-                        let fields_items = state.current_fields.items
-                            .iter().map(|f| {
-                                ListItem::new(*f).style(Style::default())
+                        let fields_items: Vec<ListItem> = state
+                            .current_fields.items.iter().map(|f| {
+                                ListItem::new(f.as_str())
+                                    .style(Style::default())
                         }).collect();
-                        let fields_list = 
-                            create_list(fields_items, String::from("Fields")
-                        );
 
+                        let fields_list = List::new(fields_items)
+                                .block(Block::default()
+                                .title("Fields"));
 
                         if fields_idx != NO_SELECTION {
                             //== Render fields ==//

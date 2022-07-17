@@ -57,67 +57,73 @@ impl Cookie {
             if !fields.split(",").any(|s| {s==*f || fields == ALL_FIELDS} ) {
                String::from("")
             } else {
-                match *f {
-                "Host" =>       {
-                    self.field_fmt(
-                        color, use_name, "Host", self.host.to_owned() 
-                    )
-                },
-                "Name" =>       {
-                    self.field_fmt(
-                        color, use_name, "Name", self.name.to_owned() 
-                    )
-                },
-                "Value" =>      {
-                    let has_enc = self.value.is_empty() && 
-                             !self.encrypted_value.is_empty();
-                    let val = if has_enc {
-                        String::from(ENCRYPTED_VALUE)
-                     } else {
-                        self.value.to_owned()
-                     };
-                    self.field_fmt(color, use_name, "Value", val)
-                },
-                "Path" =>       {
-                    self.field_fmt(
-                        color, use_name, "Path", self.path.to_owned() 
-                    )
-                },
-                "Creation" =>   {
-                    self.field_fmt(color, use_name, "Creation", 
-                        Utc.timestamp(self.creation, 0)
-                    )
-                },
-                "Expiry" =>     {
-                    self.field_fmt(
-                        color, use_name, "Expiry", Utc.timestamp(self.expiry,0)
-                    )
-                },
-                "LastAccess" => {
-                    self.field_fmt(color, use_name, "LastAccess", 
-                        Utc.timestamp(self.last_access,0)
-                    )
-                },
-                "HttpOnly" =>   {
-                    self.field_fmt(color, use_name, "HttpOnly", self.http_only)
-                },
-                "Secure" =>   {
-                    self.field_fmt(color, use_name, "Secure", self.secure)
-                },
-                "SameSite" =>   {
-                    let samesite = match self.samesite {
-                        2 => "Strict",
-                        1 => "Lax",
-                        0 => "None",
-                        _ => panic!("Unknown SameSite type")
-                    };
-                    self.field_fmt(color, use_name, "SameSite", samesite)
-                },
-                _ => panic!("Unknown cookie field")
-                }
+                self.match_field(*f,use_name,color)
             }}).filter(|f| f != "" ).collect();
         values.sort();
         values.join("\n")
+    }
+
+    /// Create formatteed output for a given field
+    pub fn match_field(&self, field_name: &str, use_name: bool, color: bool) 
+     -> String {
+        match field_name {
+        "Host" =>       {
+            self.field_fmt(
+                color, use_name, "Host", self.host.to_owned() 
+            )
+        },
+        "Name" =>       {
+            self.field_fmt(
+                color, use_name, "Name", self.name.to_owned() 
+            )
+        },
+        "Value" =>      {
+            let has_enc = self.value.is_empty() && 
+                     !self.encrypted_value.is_empty();
+            let val = if has_enc {
+                String::from(ENCRYPTED_VALUE)
+             } else {
+                self.value.to_owned()
+             };
+            self.field_fmt(color, use_name, "Value", val)
+        },
+        "Path" =>       {
+            self.field_fmt(
+                color, use_name, "Path", self.path.to_owned() 
+            )
+        },
+        "Creation" =>   {
+            self.field_fmt(color, use_name, "Creation", 
+                Utc.timestamp(self.creation, 0)
+            )
+        },
+        "Expiry" =>     {
+            self.field_fmt(
+                color, use_name, "Expiry", Utc.timestamp(self.expiry,0)
+            )
+        },
+        "LastAccess" => {
+            self.field_fmt(color, use_name, "LastAccess", 
+                Utc.timestamp(self.last_access,0)
+            )
+        },
+        "HttpOnly" =>   {
+            self.field_fmt(color, use_name, "HttpOnly", self.http_only)
+        },
+        "Secure" =>   {
+            self.field_fmt(color, use_name, "Secure", self.secure)
+        },
+        "SameSite" =>   {
+            let samesite = match self.samesite {
+                2    => "Strict",
+                1    => "Lax",
+                -1|0 => "None",
+                _ => panic!("Unknown SameSite type")
+            };
+            self.field_fmt(color, use_name, "SameSite", samesite)
+        },
+        _ => panic!("Unknown cookie field")
+        }
     }
 
     /// The output format of cookie fields listed with the `cookies` option
