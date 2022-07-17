@@ -18,7 +18,7 @@ use crossterm::{
 };
 
 use crate::{
-    config::{DEBUG_LOG,INVALID_SPLIT_ERR},
+    config::{DEBUG_LOG,INVALID_SPLIT_ERR,TUI_SELECTED_ROW},
     cookie_db::CookieDB,
     state::State
 };
@@ -52,18 +52,15 @@ pub fn run(cookie_dbs: &Vec<CookieDB>) -> Result<(),io::Error> {
 }
 
 /// Application loop
-fn run_ui<B: Backend>(
-    terminal: &mut Terminal<B>,
-    state: &mut State,
-    tick_rate: Duration
-) -> io::Result<()> {
+fn run_ui<B: Backend>(term: &mut Terminal<B>, state: &mut State,
+ tick_rate: Duration) -> io::Result<()> {
     let mut last_tick = Instant::now();
 
     // Auto-select the first profile: TODO handle no-profiles
     state.profiles.state.select(Some(0));
 
     loop {
-        terminal.draw(|f| ui(f,state))?;
+        term.draw(|f| ui(f,state))?;
 
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
@@ -86,66 +83,86 @@ fn run_ui<B: Backend>(
 /// Handle keyboard input
 fn handle_key(code: KeyCode, state: &mut State) {
     match code {
+        //== Deselect the current split ==//
         KeyCode::Left|KeyCode::Char('h') => {
-            // TODO call unselect() on the correct list
             match state.selected_split {
                 0 => {  }
-                1 => { 
-                  let domain = state.domains_for_profile();
-                  if domain.is_some() {
-                    domain.unwrap().state.select(None);
-                    state.selected_split -= 1
+                1 => {
+                  let dms = state.domains_for_profile();
+                  if let Some(dms) = dms {
+                      dms.state.select(None);
+                      state.selected_split -= 1
                   }
                 }
-                2 => {  }
+                2 => {
+                  let cks = state.cookies_for_domain();
+                  if let Some(cks) = cks {
+                      cks.state.select(None);
+                      state.selected_split -= 1
+                  }
+                }
                _ => panic!("{}", INVALID_SPLIT_ERR)
             }
 
         },
+        //== Go to next item in split ==//
         KeyCode::Down|KeyCode::Char('j') => {
             match state.selected_split {
                 0 => { state.profiles.next() }
-                1 => {  
-                  let domain = state.domains_for_profile();
-                  if domain.is_some() {
-                      domain.unwrap().next()
+                1 => {
+                  let dms = state.domains_for_profile();
+                  if let Some(dms) = dms {
+                      dms.next();
                   }
-
                 }
-                2 => {  }
+                2 => {
+                  let cks = state.cookies_for_domain();
+                  if let Some(cks) = cks {
+                      cks.next()
+                  }
+                }
                _ => panic!("{}", INVALID_SPLIT_ERR)
             }
-            // TODO call next on the correct list
         },
+        //== Go to previous item in split ==//
         KeyCode::Up|KeyCode::Char('k') => {
             match state.selected_split {
                 0 => { state.profiles.previous() }
-                1 => {  
-                  let domain = state.domains_for_profile();
-                  if domain.is_some() {
-                      domain.unwrap().previous()
+                1 => {
+                  let dms = state.domains_for_profile();
+                  if let Some(dms) = dms {
+                      dms.previous();
                   }
                 }
-                2 => {  }
+                2 => {
+                  let cks = state.cookies_for_domain();
+                  if let Some(cks) = cks {
+                      cks.previous()
+                  }
+                }
                _ => panic!("{}", INVALID_SPLIT_ERR)
             }
-            // TODO call previous on the correct list
         },
+        //== Select the next split ==//
         KeyCode::Right|KeyCode::Char('l') => {
             if state.selected_split < 2 {
+               // if_let chaining is used to ensure
+               // that the next split has at least one item
+               // before switching
                match state.selected_split {
                    0 => {
-                      let domain = state.domains_for_profile();
-                      if domain.is_some() {
-                          // TODO: handle case where no domains exist
-                          domain.unwrap().state.select(Some(0));
+                      let dms = state.domains_for_profile();
+                      if let Some(dms) = dms && dms.items.len() > 0 {
+                          dms.state.select(Some(0));
                           state.selected_split+=1;
                       }
                    },
                    1 => {
-                      state.selected_split+=1;
-                      // Select the first item from the current
-                      // `cookies_for_domain`
+                      let cks = state.cookies_for_domain();
+                      if let Some(cks) = cks && cks.items.len() > 0 {
+                          cks.state.select(Some(0));
+                          state.selected_split+=1;
+                      }
                    }
                    _ => panic!("{}", INVALID_SPLIT_ERR)
                }
@@ -181,8 +198,6 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
     );
 
     //== Domains ==//
-    // `domains_for_profile` and `cookies_for_domain`
-    // need to mutably borrowed to support updates in the frame
     let domains = state.domains_for_profile();
 
     if domains.is_some() {
@@ -220,6 +235,7 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
     }
 }
 
+/// Create a TUI `List` from a `ListItem` vector
 fn create_list(items: Vec<ListItem>, title: String) -> List {
     List::new(items)
         .block(Block::default().borders(Borders::RIGHT)
@@ -230,7 +246,7 @@ fn create_list(items: Vec<ListItem>, title: String) -> List {
                 .fg(Color::Black)
                 .add_modifier(Modifier::BOLD),
         )
-        .highlight_symbol(">> ")
+        .highlight_symbol(TUI_SELECTED_ROW)
 }
 
 /// Print a debug message to `DEBUG_LOG`

@@ -128,20 +128,23 @@ impl<'a> State<'a> {
     }
 
     /// Fetch the `StatefulList` of domains for the currently selected profile
+    /// as a mutable reference.
+    /// The `render_stateful_widget()` method on a frame requires a mutable
+    /// reference.
     pub fn domains_for_profile(&mut self) -> Option<&mut StatefulList<&'a str>> {
         let selected: usize = self.profiles.state.selected()
                 .unwrap_or_else(|| NO_SELECTION);
         if selected != NO_SELECTION {
             // Note that the reference is mutable, this is required to call
-            // e.g. `select()` and `unselect()`
+            // e.g. `select()`
             self.domains.get_mut(self.profiles.items.get(selected).unwrap())
         } else {
            None
         }
     }
 
-    /// Fetch the `StatefulList` of cookies for the currently selected domain 
-    /// of a specific profile
+    /// Fetch the `StatefulList` of cookies for the currently selected domain
+    /// of the current profile as a mutable reference.
     pub fn cookies_for_domain(&mut self) -> Option<&mut StatefulList<&'a Cookie>> {
         let current_profile = self._selected_profile();
         if current_profile.is_some() {
@@ -151,7 +154,7 @@ impl<'a> State<'a> {
             let current_domains = self.domains_for_profile();
             if current_domains.is_some() {
                 let current_domains = current_domains.unwrap();
-                
+
                 let selected_idx = current_domains.state.selected()
                     .unwrap_or_else(|| NO_SELECTION);
                 if selected_idx != NO_SELECTION {
@@ -159,17 +162,11 @@ impl<'a> State<'a> {
                         current_domains.items.get(selected_idx).unwrap().clone();
 
                     let key = format!("{}{}", current_profile, current_domain);
-                    self.cookies.get_mut(&key)
-                } else {
-                    None
+                    return self.cookies.get_mut(&key);
                 }
-            } else {
-                None
             }
-        } else {
-            None
         }
+        None
     }
-
 }
 
