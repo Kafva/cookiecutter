@@ -104,13 +104,13 @@ impl<'a> State<'a> {
     }
 
 
+    /// The currently selected domain (if any)
     pub fn selected_domain(&self) -> Option<&&str> {
         if let Some(selected_idx) = self.current_domains.status.selected() {
             self.current_domains.items.get(selected_idx)
         } else {
             None
         }
-
     }
 }
 
