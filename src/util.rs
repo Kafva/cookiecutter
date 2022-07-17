@@ -7,8 +7,15 @@ use walkdir::WalkDir;
 
 use sysinfo::{System, SystemExt, RefreshKind};
 
-use crate::types::{DbType,CookieDB};
+use crate::cookie_db::CookieDB;
 use crate::config::{SEARCH_DIRS,DB_NAMES};
+
+/// The PartialEq trait allows us to use `matches!` to check
+/// equality between enums
+#[derive(Debug,PartialEq)]
+pub enum DbType {
+    Chrome, Firefox, Unknown
+}
 
 /// Returns /mnt/c/Users/$USER under WSL, otherwise the value of $HOME
 pub fn get_home() -> String {
@@ -133,8 +140,7 @@ pub fn parse_whitelist(filepath: &Path) -> Result<Vec<String>,io::Error> {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
-    use crate::cookie_db_type;
-    use crate::types::DbType;
+    use crate::util::{DbType,cookie_db_type};
 
     #[test]
     fn test_is_cookie_db() {

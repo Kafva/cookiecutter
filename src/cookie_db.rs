@@ -1,8 +1,47 @@
+use std::hash::{Hash, Hasher};
+use std::cmp;
+
 use crate::config::{COOKIE_FIELDS,Config};
-use crate::types::{DbType,CookieDB,Cookie};
-use crate::funcs::get_home;
+use crate::cookie::Cookie;
+use crate::util::{get_home,DbType};
 use crate::{debugln,msg_prefix};
 
+
+#[derive(Debug)]
+pub struct CookieDB {
+    pub path: std::path::PathBuf,
+    pub typing: DbType,
+    pub cookies: Vec<Cookie>
+}
+
+//== Enable hashing ==//
+impl PartialEq for CookieDB {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path && self.typing == other.typing
+    }
+}
+impl Eq for CookieDB {}
+
+impl Hash for CookieDB {
+    /// Only considers the filepath of the cookie database
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.path.hash(state);
+    }
+}
+
+//== Enable sorting ==//
+impl PartialOrd for CookieDB {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.path.cmp(&other.path))
+    }
+}
+impl Ord for CookieDB {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.partial_cmp(&other).unwrap()
+    }
+}
+
+//== Main impl ==//
 impl CookieDB {
     /// Return the parent of the current path and replaces $HOME with "~".
     /// Returns `path` as is if it is not an absolute path.
@@ -131,12 +170,11 @@ impl CookieDB {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::path::PathBuf;
-    use crate::types::{DbType,CookieDB};
-    use crate::funcs::get_home;
+    use crate::cookie_db::CookieDB;
+    use crate::util::{get_home,DbType};
 
     #[test]
     fn test_path_short() {

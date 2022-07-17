@@ -5,17 +5,17 @@ use clap::{Parser,CommandFactory};
 
 //=== Project imports ===//
 mod config;
-mod funcs;
+mod util;
 mod macros;
-mod types;
 mod cookie;
 mod cookie_db;
+mod state;
 mod tui;
 use crate::config::{
     Args,Config,CONFIG,COOKIE_FIELDS,ALL_FIELDS,DEBUG_LOG
 };
-use crate::funcs::{cookie_db_type,process_is_running,cookie_dbs_from_profiles,parse_whitelist};
-use crate::types::CookieDB;
+use crate::util::{cookie_db_type,process_is_running,cookie_dbs_from_profiles,parse_whitelist};
+use crate::cookie_db::CookieDB;
 use crate::tui::run;
 
 fn main() -> Result<(),()> {
