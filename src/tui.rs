@@ -9,7 +9,10 @@ use tui::{
     layout::{Constraint, Direction, Layout},
     text::Span,
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, Cell, Row, Table, BorderType},
+    widgets::{
+        Block, Borders, List, ListItem, Cell, Row, Table, 
+        BorderType
+    },
     Frame, Terminal,
 };
 use crossterm::{
@@ -22,7 +25,8 @@ use crate::{
     config::{
         DEBUG_LOG,INVALID_SPLIT_ERR,
         NO_SELECTION,
-        TUI_PRIMARY_COLOR
+        TUI_PRIMARY_COLOR,
+        TUI_TEXT_TRUNCATE_LIM
     },
     cookie_db::CookieDB,
     state::State
@@ -158,6 +162,18 @@ fn handle_key(code: KeyCode, state: &mut State) {
                _ => panic!("{}", INVALID_SPLIT_ERR)
            }
         },
+        //== Select field through search ==//
+        KeyCode::Char('/') => {
+            // 1. Read input (input box should hide the controls)
+            // 2. Move selection to first match in current split
+        },
+        //== Delete cookie(s) ==//
+        KeyCode::Char('D') => {
+            // Deleteion message should cover controls
+        },
+        //== Copy value to clipboard ==//
+        KeyCode::Char('C') => {
+        },
         _ => {  }
     }
 }
@@ -194,6 +210,7 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
         ].as_ref())
         .split(vert_chunks[0]);
 
+
     // Create the footer with usage strings
     let cells = [
         Cell::from("/: Search")
@@ -226,12 +243,13 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 
     if profiles_idx != NO_SELECTION {
         //== Profiles ==//
-        let profile_items: Vec<ListItem> = state.profiles.items.iter().map(|p| {
-            ListItem::new(p.as_str()).style(Style::default())
-        }).collect();
+        let profile_items: Vec<ListItem> = 
+            create_list_items(&state.profiles.items);
 
-        let profile_list = create_list(
-            profile_items, String::from("Profiles"), Borders::NONE
+        let profile_list =  add_highlight( 
+            create_list(profile_items, 
+                "Profiles".to_string(), Borders::NONE
+            )
         );
 
         //== Render profiles ==//
@@ -246,12 +264,10 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
             // Fill the current_domains state list
             state.current_domains.items = cdb.domains();
 
-            // Create list items for the UI
-            let domain_items: Vec<ListItem> = cdb.domains().iter().map(|p| {
-                    ListItem::new(p.to_owned()).style(Style::default())
-            }).collect();
-            let domain_list = create_list(
-                domain_items, String::from("Domains"), Borders::NONE
+            let domain_items = create_list_items(&state.current_domains.items);
+
+            let domain_list = add_highlight(
+                create_list(domain_items, "Domains".to_string(), Borders::NONE)
             );
 
             //== Render domains ==//
@@ -267,15 +283,15 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
                     cdb.cookies_for_domain(&current_domain).iter()
                         .map(|c| c.name.as_str() ).collect();
 
-                // Create list items for the UI
-                let cookies_items = state.current_cookies.items.iter().map(|c| {
-                        ListItem::new(*c).style(Style::default())
-                }).collect();
-                let cookies_list = 
+                let cookies_items = create_list_items(
+                    &state.current_cookies.items
+                );
+
+                let cookies_list = add_highlight(
                     create_list(cookies_items, 
-                                String::from("Cookies"),
-                                Borders::NONE
-                    );
+                        "Cookies".to_string(),
+                        Borders::NONE
+                ));
 
                 //== Render cookies ==//
                 frame.render_stateful_widget(
@@ -303,23 +319,12 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
                         ];
 
                         // Create list items for the UI
-                        let fields_items: Vec<ListItem> = state
-                            .current_fields.items.iter().map(|f| {
-                                ListItem::new(f.as_str())
-                                    .style(Style::default())
-                        }).collect();
+                        let fields_items: Vec<ListItem> = 
+                            create_list_items(&state.current_fields.items);
 
-                        let fields_list = List::new(fields_items)
-                                .block(Block::default()
-                                .border_type(BorderType::Rounded)
-                                .borders(Borders::ALL)
-                                .title(Span::styled("Fields", 
-                                    Style::default()
-                                    .fg(Color::Indexed(TUI_PRIMARY_COLOR))
-                                        .add_modifier(Modifier::UNDERLINED)
-                                    )
-                                )
-                            );
+                        let fields_list = create_list(
+                            fields_items, "Fields".to_string(), Borders::ALL
+                        );
 
                         if fields_idx != NO_SELECTION {
                             //== Render fields ==//
@@ -338,6 +343,30 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
     }
 }
 
+/// Create list items for the UI
+/// Nodes with text exceeding `TUI_TEXT_TRUNCATE_LIM`
+/// will be truncated with `...`
+fn create_list_items<T: ToString>(items: &Vec<T>) -> Vec<ListItem> {
+    items.iter().map(|p| {
+        let p: String = p.to_string();
+        let text = if p.len() > TUI_TEXT_TRUNCATE_LIM {
+            format!("{}..", &p[0..TUI_TEXT_TRUNCATE_LIM])
+        } else {
+            p
+        };
+        ListItem::new(text)
+    }).collect()
+}
+
+/// Highlighted the currently selected item
+fn add_highlight(list: List) -> List {
+    list.highlight_style(
+        Style::default()
+            .fg(Color::Indexed(TUI_PRIMARY_COLOR))
+            .add_modifier(Modifier::BOLD),
+    )
+}
+
 /// Create a TUI `List` from a `ListItem` vector
 fn create_list(items: Vec<ListItem>, title: String, border: Borders) -> List {
     List::new(items)
@@ -345,15 +374,9 @@ fn create_list(items: Vec<ListItem>, title: String, border: Borders) -> List {
             Block::default().border_type(BorderType::Rounded).borders(border)
             .title(Span::styled(title, 
                     Style::default().fg(Color::Indexed(TUI_PRIMARY_COLOR))
-                        .add_modifier(Modifier::UNDERLINED)
-                        .add_modifier(Modifier::BOLD),
+                        .add_modifier(Modifier::UNDERLINED|Modifier::BOLD)
                 )
             )
-        )
-        .highlight_style(
-            Style::default()
-                .fg(Color::Indexed(TUI_PRIMARY_COLOR))
-                .add_modifier(Modifier::BOLD),
         )
 }
 

@@ -47,6 +47,7 @@ pub const NO_SELECTION: usize = 9999999;
 pub const INVALID_SPLIT_ERR: &'static str = "Invalid split selection";
 pub const DEBUG_LOG: &'static str = "rokie.log";
 pub const TUI_PRIMARY_COLOR: u8 = 111;
+pub const TUI_TEXT_TRUNCATE_LIM: usize = 48;
 
 //=== CLI arguments ===//
 #[derive(Debug,Subcommand)]
@@ -83,8 +84,7 @@ enum SubArgs {
         #[clap(short, long)]
         apply: bool
     },
-    /// Open a TUI were cookies across all installed browsers can be viewed
-    /// and manipulated
+    /// Interactive view of cookies across all browsers
     Tui {
     }
 }
