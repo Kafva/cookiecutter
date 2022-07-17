@@ -69,10 +69,12 @@ pub struct State<'a> {
     pub profiles: StatefulList<String>,
 
     // The cookies and domain lists will need to be updatable
-    // profile        -> stateful list of domains
-    // profile+domain -> stateful list of cookies
+    // profile              -> stateful list of domains
+    // profile+domain       -> stateful list of cookies
     pub domains: HashMap<String,StatefulList<&'a str>>,
     pub cookies: HashMap<String,StatefulList<&'a Cookie>>,
+
+    pub current_fields: StatefulList<&'a str>
 }
 impl<'a> State<'a> {
     /// Create a TUI state object from a vector of cookie databases
@@ -110,7 +112,11 @@ impl<'a> State<'a> {
         }
 
         State {
-            selected_split: 0, profiles, domains, cookies
+            selected_split: 0, profiles, domains, cookies, 
+            current_fields: StatefulList { 
+                state: ListState::default(), 
+                items: vec![] 
+            }
         }
     }
 
@@ -124,8 +130,8 @@ impl<'a> State<'a> {
         } else {
            None
         }
-
     }
+
 
     /// Fetch the `StatefulList` of domains for the currently selected profile
     /// as a mutable reference.
@@ -146,25 +152,37 @@ impl<'a> State<'a> {
     /// Fetch the `StatefulList` of cookies for the currently selected domain
     /// of the current profile as a mutable reference.
     pub fn cookies_for_domain(&mut self) -> Option<&mut StatefulList<&'a Cookie>> {
-        let current_profile = self._selected_profile();
-        if current_profile.is_some() {
-            // .clone() to dodge BC
-            let current_profile = current_profile.unwrap().clone();
+        if let Some(current_profile) = self._selected_profile() {
+           // .clone() to dodge BC
+           let current_profile = current_profile.clone();
 
-            let current_domains = self.domains_for_profile();
-            if current_domains.is_some() {
-                let current_domains = current_domains.unwrap();
+           if let Some(current_domains) = self.domains_for_profile() {
 
-                let selected_idx = current_domains.state.selected()
-                    .unwrap_or_else(|| NO_SELECTION);
-                if selected_idx != NO_SELECTION {
-                    let current_domain = // .clone() to dodge BC
-                        current_domains.items.get(selected_idx).unwrap().clone();
+               let selected_idx = current_domains.state.selected()
+                   .unwrap_or_else(|| NO_SELECTION);
 
-                    let key = format!("{}{}", current_profile, current_domain);
-                    return self.cookies.get_mut(&key);
-                }
-            }
+               if selected_idx != NO_SELECTION {
+                   let current_domain = // .clone() to dodge BC
+                       current_domains.items.get(selected_idx).unwrap().clone();
+
+                   let key = format!("{}{}", current_profile, current_domain);
+                   return self.cookies.get_mut(&key);
+               }
+           }
+        }
+        None
+    }
+
+    /// Return the Cookie object for the currently selected `Cookie` (if any)
+    pub fn fields_for_cookie(&mut self) -> Option<&'a Cookie> {
+        if let Some(current_cookies) = self.cookies_for_domain() {
+           let selected_idx = current_cookies.state.selected()
+               .unwrap_or_else(|| NO_SELECTION);
+
+           if selected_idx != NO_SELECTION {
+                // .clone() to dodge BC
+                return Some(current_cookies.items.get(selected_idx).unwrap().clone());
+           }
         }
         None
     }

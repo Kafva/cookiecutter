@@ -18,7 +18,7 @@ use crossterm::{
 };
 
 use crate::{
-    config::{DEBUG_LOG,INVALID_SPLIT_ERR,TUI_SELECTED_ROW},
+    config::{DEBUG_LOG,INVALID_SPLIT_ERR,TUI_SELECTED_ROW,NO_SELECTION,ALL_FIELDS},
     cookie_db::CookieDB,
     state::State
 };
@@ -120,6 +120,9 @@ fn handle_key(code: KeyCode, state: &mut State) {
                   if let Some(cks) = cks {
                       cks.next()
                   }
+                },
+                3 => {
+
                 }
                _ => panic!("{}", INVALID_SPLIT_ERR)
             }
@@ -185,24 +188,36 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
         ].as_ref()).split(frame.size());
 
 
-    //== Profiles ==//
-    let profile_items: Vec<ListItem> = state.profiles.items.iter().map(|p| {
-        ListItem::new(p.as_str()).style(Style::default())
-    }).collect();
+    // Lists will be displayed at different indices depending on if
+    // which of the two views are active:
+    //  View 1:
+    //  |profiles|domains|cookie names|
+    //
+    //  View 2:
+    //  |domains|cookie names|field list|
+    let (profiles_idx, domains_idx, cookies_idx, fields_idx) = 
+        if state.selected_split < 3 {
+            (0,1,2,NO_SELECTION)
+        } else {
+            (NO_SELECTION,0,1,2)
+        };
 
-    let profile_list = create_list(profile_items, String::from("Profiles"));
+    if profiles_idx != NO_SELECTION {
+        //== Profiles ==//
+        let profile_items: Vec<ListItem> = state.profiles.items.iter().map(|p| {
+            ListItem::new(p.as_str()).style(Style::default())
+        }).collect();
 
-    //== Render profiles ==//
-    frame.render_stateful_widget(
-        profile_list, chunks[0], &mut state.profiles.state
-    );
+        let profile_list = create_list(profile_items, String::from("Profiles"));
+
+        //== Render profiles ==//
+        frame.render_stateful_widget(
+            profile_list, chunks[profiles_idx], &mut state.profiles.state
+        );
+    }
 
     //== Domains ==//
-    let domains = state.domains_for_profile();
-
-    if domains.is_some() {
-        let domains = domains.unwrap();
-
+    if let Some(domains) = state.domains_for_profile() {
         let domain_items: Vec<ListItem> = domains
             .items.iter().map(|p| {
                 ListItem::new(*p).style(Style::default())
@@ -212,26 +227,49 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 
         //== Render domains ==//
         frame.render_stateful_widget(
-            domain_list, chunks[1], &mut domains.state
+            domain_list, chunks[domains_idx], &mut domains.state
         );
 
         //== Cookies ==//
-        let cookies = state.cookies_for_domain();
-        if cookies.is_some() {
-            let cookies = cookies.unwrap();
-            let cookie_items: Vec<ListItem> = cookies.items.iter()
+        if let Some(cookies) = state.cookies_for_domain() {
+            let cookies_items: Vec<ListItem> = cookies.items.iter()
                 .map(|c| {
                     ListItem::new(c.name.as_str()).style(Style::default())
             }).collect();
 
-            let cookie_list =
-                create_list(cookie_items, String::from("Cookies"));
+            let cookies_list =
+                create_list(cookies_items, String::from("Cookies"));
 
             //== Render cookies ==//
             frame.render_stateful_widget(
-                cookie_list, chunks[2], &mut cookies.state
+                cookies_list, chunks[cookies_idx], &mut cookies.state
             );
+
+            //== Fields ==//
+            //if let Some(current_cookie) = state.fields_for_cookie() {
+
+            //    let fields_items = current_cookie.as_list_items();
+
+            //    let fields_list =
+            //        create_list(fields_items, String::from("Fields"));
+
+            //    let tmp = current_cookie
+            //            .fields_as_str(
+            //                &String::from(ALL_FIELDS),
+            //                true,
+            //                false
+            //            ).split("\n");
+
+            //    state.current_fields.items = tmp.collect();
+
+            //    //== Render fields ==//
+            //    frame.render_stateful_widget(
+            //        fields_list, chunks[fields_idx], &mut state.current_fields.state
+            //    );
+
+            //}
         }
+
     }
 }
 

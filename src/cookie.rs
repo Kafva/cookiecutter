@@ -1,7 +1,11 @@
 use std::fmt;
+
 use chrono::{TimeZone,Utc};
-use crate::{Config,COOKIE_FIELDS,ALL_FIELDS};
+use tui::{widgets::ListItem, style::Style};
+
+use crate::{COOKIE_FIELDS,ALL_FIELDS};
 use crate::config::ENCRYPTED_VALUE;
+
 
 #[derive(Debug)]
 pub struct Cookie {
@@ -47,7 +51,8 @@ pub struct Cookie {
 impl Cookie {
     /// Construct a newline separated string with the specified field names
     /// The `fields` parameter is a comma separated string or `All`
-    pub fn fields_as_str(&self, fields: &String, use_name: bool) -> String {
+    pub fn fields_as_str(&self, fields: &String, use_name: bool, color: bool) 
+     -> String {
         let mut values: Vec<String> = COOKIE_FIELDS.keys().map(|f| {
             // Skip fields not listed in the --fields option
             if !fields.split(",").any(|s| {s==*f || fields == ALL_FIELDS} ) {
@@ -55,10 +60,14 @@ impl Cookie {
             } else {
                 match *f {
                 "Host" =>       {
-                    self.field_fmt(use_name, "Host", self.host.to_owned() )
+                    self.field_fmt(
+                        color, use_name, "Host", self.host.to_owned() 
+                    )
                 },
                 "Name" =>       {
-                    self.field_fmt(use_name, "Name", self.name.to_owned() )
+                    self.field_fmt(
+                        color, use_name, "Name", self.name.to_owned() 
+                    )
                 },
                 "Value" =>      {
                     let has_enc = self.value.is_empty() && 
@@ -68,29 +77,33 @@ impl Cookie {
                      } else {
                         self.value.to_owned()
                      };
-                    self.field_fmt(use_name, "Value", val)
+                    self.field_fmt(color, use_name, "Value", val)
                 },
                 "Path" =>       {
-                    self.field_fmt(use_name, "Path", self.path.to_owned() )
+                    self.field_fmt(
+                        color, use_name, "Path", self.path.to_owned() 
+                    )
                 },
                 "Creation" =>   {
-                    self.field_fmt(use_name, "Creation", 
+                    self.field_fmt(color, use_name, "Creation", 
                         Utc.timestamp(self.creation, 0)
                     )
                 },
                 "Expiry" =>     {
-                    self.field_fmt(use_name, "Expiry", Utc.timestamp(self.expiry,0))
+                    self.field_fmt(
+                        color, use_name, "Expiry", Utc.timestamp(self.expiry,0)
+                    )
                 },
                 "LastAccess" => {
-                    self.field_fmt(use_name, "LastAccess", 
+                    self.field_fmt(color, use_name, "LastAccess", 
                         Utc.timestamp(self.last_access,0)
                     )
                 },
                 "HttpOnly" =>   {
-                    self.field_fmt(use_name, "HttpOnly", self.http_only)
+                    self.field_fmt(color, use_name, "HttpOnly", self.http_only)
                 },
                 "Secure" =>   {
-                    self.field_fmt(use_name, "Secure", self.secure)
+                    self.field_fmt(color, use_name, "Secure", self.secure)
                 },
                 "SameSite" =>   {
                     let samesite = match self.samesite {
@@ -99,7 +112,7 @@ impl Cookie {
                         0 => "None",
                         _ => panic!("Unknown SameSite type")
                     };
-                    self.field_fmt(use_name, "SameSite", samesite)
+                    self.field_fmt(color, use_name, "SameSite", samesite)
                 },
                 _ => panic!("Unknown cookie field")
                 }
@@ -109,11 +122,11 @@ impl Cookie {
     }
 
     /// The output format of cookie fields listed with the `cookies` option
-    fn field_fmt<T: fmt::Display>(&self, use_name: bool, name: &'static str, value: T) 
-     -> String {
+    fn field_fmt<T: fmt::Display>(&self, color: bool, use_name: bool, 
+     name: &'static str, value: T) -> String {
         let mut output = String::new();
         if use_name {
-            output = if Config::global().nocolor {
+            output = if !color {
                 format!("{}: ", name)
             } else {
                 format!("\x1b[97;1m{}:\x1b[0m ", name)
@@ -122,6 +135,13 @@ impl Cookie {
         output + &value.to_string()
     }
 
+    /// Create a `ListItem` vector with one item for each field of the cookie
+    pub fn as_list_items(&self) -> Vec<ListItem> {
+        self.fields_as_str(&String::from(ALL_FIELDS), true, false).split("\n")
+            .map(|f|{
+                ListItem::new(f.to_owned()).style(Style::default()) 
+        }).collect()
+    }
 }
 
 impl fmt::Display for Cookie {

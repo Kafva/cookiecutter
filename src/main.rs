@@ -107,7 +107,7 @@ fn main() -> Result<(),()> {
 
                     output_str = output_str +
                         &c.fields_as_str(&Config::global().fields,
-                            multiple_fields
+                            multiple_fields, !Config::global().nocolor
                         ) + "\n";
 
                     if multiple_fields {
