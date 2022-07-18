@@ -11,7 +11,7 @@ use tui::{
     style::{Color, Modifier, Style},
     widgets::{
         Block, Borders, List, ListItem, Cell, Row, Table, 
-        BorderType
+        BorderType, Paragraph
     },
     Frame, Terminal,
 };
@@ -23,13 +23,14 @@ use crossterm::{
 
 use crate::{
     config::{
-        DEBUG_LOG,INVALID_SPLIT_ERR,
+        DEBUG_LOG,
         NO_SELECTION,
         TUI_PRIMARY_COLOR,
-        TUI_TEXT_TRUNCATE_LIM
+        TUI_TEXT_TRUNCATE_LIM,
+        TUI_SEARCH
     },
     cookie_db::CookieDB,
-    state::State
+    state::{State,Selection}
 };
 
 /// Entrypoint for the TUI
@@ -79,9 +80,15 @@ fn run_ui<B: Backend>(term: &mut Terminal<B>, state: &mut State,
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') => return Ok(()),
-                    _ => handle_key(key.code, state)
+                if state.search_open {
+                    //== Input mode ==//
+                    handle_search_key(key.code, state)
+                } else {
+                    //== Normal mode ==//
+                    match key.code {
+                        KeyCode::Char('q') => return Ok(()),
+                        _ => handle_key(key.code, state)
+                    }
                 }
             }
         }
@@ -91,81 +98,144 @@ fn run_ui<B: Backend>(term: &mut Terminal<B>, state: &mut State,
     }
 }
 
+/// Save all partial matches of the query to `search_matches` and
+/// return the index of the first match (if any)
+fn set_matches(items: &Vec<&str>, q: String, search_matches: &mut Vec<usize>)
+ -> Option<usize> {
+    for (i,p) in items.iter().enumerate() {
+        if p.contains(&q) {
+            search_matches.push(i);
+        }
+    }
+    // We want to pop the first match first
+    search_matches.reverse();
+    search_matches.pop()
+}
+
+fn handle_search_key(code: KeyCode, state: &mut State) {
+    match code {
+        KeyCode::Enter => {
+            state.search_open = false;
+            state.search_matches.clear();
+            let query: String = state.search_field.drain(..).collect();
+
+            match state.selection {
+                Selection::Profiles => {
+                    // Save all partial matches
+                    for (i,p) in state.cookie_dbs.iter().enumerate() {
+                        if p.path.to_string_lossy().contains(&query) {
+                            state.search_matches.push(i);
+                        }
+                    }
+                    // Move selection to the first match (if any)
+                    let first_match = state.search_matches.pop();
+                    state.profiles.status.select(first_match)
+                },
+                Selection::Domains => {
+                    let first_match = set_matches(
+                        &state.current_domains.items, 
+                        query,
+                        &mut state.search_matches
+                    );
+                    state.current_domains.status.select(first_match);
+                },
+                Selection::Cookies => {
+                    let first_match = set_matches(
+                        &state.current_cookies.items, 
+                        query,
+                        &mut state.search_matches
+                    );
+                    state.current_cookies.status.select(first_match);
+                }
+            }
+        }
+        KeyCode::Char(c) => {
+            state.search_field.push(c);
+        }
+        KeyCode::Backspace => {
+            state.search_field.pop();
+        }
+        KeyCode::Esc => {
+            state.search_field.drain(..);
+            state.search_open = false
+        }
+        _ => {  }
+    }
+
+}
+
 /// Handle keyboard input
 fn handle_key(code: KeyCode, state: &mut State) {
     match code {
         //== Deselect the current split ==//
         KeyCode::Left|KeyCode::Char('h') => {
-            match state.selected_split {
-                0 => {  }
-                1 => {
+            match state.selection {
+                Selection::Profiles => {  }
+                Selection::Domains => {
                     state.current_domains.status.select(None);
-                    state.selected_split-=1;
+                    state.selection = Selection::Profiles;
                 }
-                2 => {
+                Selection::Cookies => {
                     state.current_cookies.status.select(None);
-                    state.selected_split-=1;
+                    state.selection = Selection::Domains;
                 }
-               _ => panic!("{}", INVALID_SPLIT_ERR)
             }
 
         },
         //== Go to next item in split ==//
         KeyCode::Down|KeyCode::Char('j') => {
-            match state.selected_split {
-                0 => { state.profiles.next() }
-                1 => {
+            match state.selection {
+                Selection::Profiles => { state.profiles.next() }
+                Selection::Domains => {
                   state.current_domains.next()
                 }
-                2|3 => {
+                Selection::Cookies => {
                   // Cycle through cookies when the field
                   // window is selected
                   state.current_cookies.next()
                 },
-               _ => panic!("{}", INVALID_SPLIT_ERR)
             }
         },
         //== Go to previous item in split ==//
         KeyCode::Up|KeyCode::Char('k') => {
-            match state.selected_split {
-                0 => { state.profiles.previous() }
-                1 => {
+            match state.selection {
+                Selection::Profiles => { state.profiles.previous() }
+                Selection::Domains => {
                     state.current_domains.previous()
                 }
-                2|3 => {
+                Selection::Cookies => {
                     // Cycle through cookies when the field
                     // window is selected
                     state.current_cookies.previous()
                 }
-               _ => panic!("{}", INVALID_SPLIT_ERR)
             }
         },
         //== Select the next split ==//
         KeyCode::Right|KeyCode::Char('l') => {
-           match state.selected_split {
-               0 => {
+           match state.selection {
+               Selection::Profiles => {
                     if state.current_domains.items.len() > 0 {
                         state.current_domains.status.select(Some(0));
-                        state.selected_split+=1;
+                        state.selection = Selection::Domains;
                     }
                },
-               1 => {
+               Selection::Domains => {
                     if state.current_cookies.items.len() > 0 {
                         state.current_cookies.status.select(Some(0));
-                        state.selected_split+=1;
+                        state.selection = Selection::Cookies;
                     }
                }
-               2 => {
+               Selection::Cookies => {
                     // The `state.current_fields.items` array is empty
                     // until the next ui() tick.
                }
-               _ => panic!("{}", INVALID_SPLIT_ERR)
            }
         },
         //== Select field through search ==//
         KeyCode::Char('/') => {
             // 1. Read input (input box should hide the controls)
             // 2. Move selection to first match in current split
+            state.search_open = true
         },
         //== Delete cookie(s) ==//
         KeyCode::Char('D') => {
@@ -198,7 +268,6 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
         .as_ref())
         .split(frame.size());
 
-
     // Create three chunks for the body
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -210,35 +279,24 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
         ].as_ref())
         .split(vert_chunks[0]);
 
+    if state.search_open {
+        //== Render the search input ==//
+        let input_box = Paragraph::new(
+           format!("{} {}", TUI_SEARCH, state.search_field)
+        ).style(Style::default().fg(Color::Blue));
 
-    // Create the footer with usage strings
-    let cells = [
-        Cell::from("/: Search")
-            .style(Style::default().fg(Color::LightBlue)),
-        Cell::from("D: Delete")
-            .style(Style::default().fg(Color::LightRed)),
-        Cell::from("C: Copy")
-            .style(Style::default().fg(Color::LightYellow))
-    ];
-
-    let row = Row::new(cells).bottom_margin(1);
-    let usage = Table::new(vec![row])
-        .block(Block::default().borders(Borders::NONE))
-        .widths(&[
-            Constraint::Percentage(7),
-            Constraint::Percentage(7),
-            Constraint::Percentage(7),
-        ]);
-
-    //== Render the footer ==//
-    frame.render_widget(usage, vert_chunks[1]);
+        frame.render_widget(input_box, vert_chunks[1]);
+    } else {
+        //== Render the footer ==//
+        frame.render_widget(create_footer(), vert_chunks[1]);
+    }
 
     // Determine which splits should be rendered
     let (profiles_idx, domains_idx, cookies_idx, fields_idx) = 
-        if state.selected_split < 2 {
-            (0,1,2,NO_SELECTION)
-        } else {
+        if matches!(state.selection, Selection::Cookies) {
             (NO_SELECTION,0,1,2)
+        } else {
+            (0,1,2,NO_SELECTION)
         };
 
     if profiles_idx != NO_SELECTION {
@@ -356,6 +414,27 @@ fn create_list_items<T: ToString>(items: &Vec<T>) -> Vec<ListItem> {
         };
         ListItem::new(text)
     }).collect()
+}
+
+/// Create the usage footer
+fn create_footer() -> Table<'static> {
+    let cells = [
+        Cell::from("/: Search")
+            .style(Style::default().fg(Color::LightBlue)),
+        Cell::from("D: Delete")
+            .style(Style::default().fg(Color::LightRed)),
+        Cell::from("C: Copy")
+            .style(Style::default().fg(Color::LightYellow))
+    ];
+
+    let row = Row::new(cells).bottom_margin(1);
+    Table::new(vec![row])
+        .block(Block::default().borders(Borders::NONE))
+        .widths(&[
+            Constraint::Percentage(7),
+            Constraint::Percentage(7),
+            Constraint::Percentage(7),
+        ])
 }
 
 /// Highlighted the currently selected item

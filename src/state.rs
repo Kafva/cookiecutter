@@ -40,11 +40,22 @@ impl<T> StatefulList<T> {
     }
 }
 
+#[derive(PartialEq)]
+pub enum Selection {
+    Profiles,
+    Domains,
+    Cookies
+}
 
 /// The main struct which holds the global state of the TUI
 pub struct State<'a> {
-    /// Valid range: 0 - 2
-    pub selected_split: u8, 
+    /// The currently selected element
+    pub selection: Selection, 
+
+    pub search_open: bool,
+    pub search_field: String,
+    /// Indices of all matches from a '/' search
+    pub search_matches: Vec<usize>,
 
     // We we only keep the domains for the currently seleceted profile
     // in a StatefulList. If a domain is removed, we will update the
@@ -68,7 +79,10 @@ impl<'a> State<'a> {
             }).collect()
         };
         State {
-            selected_split: 0, 
+            selection: Selection::Profiles, 
+            search_open: false,
+            search_field: "".to_string(),
+            search_matches: vec![],
             profiles, 
             current_domains: StatefulList::default(), 
             current_cookies: StatefulList::default(), 

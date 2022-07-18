@@ -44,10 +44,10 @@ pub const COOKIE_FIELDS: phf::Map<&'static str, [&'static str; 2]> = phf_map!{
 pub const ENCRYPTED_VALUE: &'static str = "********";
 pub const ALL_FIELDS: &'static str = "All";
 pub const NO_SELECTION: usize = 9999999;
-pub const INVALID_SPLIT_ERR: &'static str = "Invalid split selection";
 pub const DEBUG_LOG: &'static str = "rokie.log";
 pub const TUI_PRIMARY_COLOR: u8 = 111;
 pub const TUI_TEXT_TRUNCATE_LIM: usize = 48;
+pub const TUI_SEARCH: &'static str = "Search:";
 
 //=== CLI arguments ===//
 #[derive(Debug,Subcommand)]
