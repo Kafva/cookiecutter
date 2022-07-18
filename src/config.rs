@@ -94,6 +94,8 @@ enum SubArgs {
 #[clap(version = "1.0", author = "Kafva <https://github.com/Kafva>",
   about = "CLI cookie manager for Firefox and Chromium")]
 /// https://github.com/clap-rs/clap/blob/v3.2.7/examples/derive_ref/README.md#arg-attributes
+/// The `value_parser` trait is required to access an option from the `args`
+/// object, this is not usable for subcommands.
 pub struct Args {
     /// Output debugging information, writes to `rokie.log` when TUI is active
     #[clap(short, long)]
@@ -107,17 +109,17 @@ pub struct Args {
     /// Any unique part of the path to profile can be used as an identifier
     /// e.g. `-p Brave` can be resolved to
     /// `~/.config/BraveSoftware/Brave-Browser/Default`
-    #[clap(short, long, default_value_t)]
-    profile: String,
+    #[clap(short, long, default_value_t, value_parser)]
+    pub profile: String,
 
     /// List valid browser profiles for the --profile option
-    #[clap(long, takes_value = false)]
-    list_profiles: bool,
+    #[clap(long, takes_value = false, value_parser)]
+    pub list_profiles: bool,
 
     /// Perform all commands on a supplied cookie database
     /// (overrides --profile)
-    #[clap(long, short, default_value_t)]
-    file: String,
+    #[clap(long, short, default_value_t, value_parser)]
+    pub file: String,
 
     #[clap(subcommand)]
     subargs: Option<SubArgs>
@@ -130,14 +132,11 @@ pub struct Config {
     pub err_exit: i32,
 
     pub debug: bool,
-    pub file: String,
     pub nocolor: bool,
-    pub profile: String,
 
     // Subcmd: cookies
     pub fields: String,
     pub no_heading: bool,
-    pub list_profiles: bool,
     pub list_fields: bool,
     pub domain: String,
 
@@ -158,13 +157,10 @@ impl Default for Config {
             whitelist: String::from(""),
             no_heading: false,
             fields: String::from(""),
-            list_profiles: false,
             list_fields: false,
             domain: String::from(""),
             nocolor: false,
             tui: false,
-            profile: String::from(""),
-            file: String::from(""),
             clean: false,
             apply: false
         }
@@ -173,27 +169,24 @@ impl Default for Config {
 
 impl Config {
     /// Initialise a new config object from an Args struct
-    pub fn from_args(args: Args) -> Self {
+    pub fn from_args(args: &Args) -> Self {
         let mut cfg       = Config::default();
         cfg.nocolor       = args.nocolor;
         cfg.debug         = args.debug;
-        cfg.file          = args.file;
-        cfg.profile       = args.profile;
-        cfg.list_profiles = args.list_profiles;
 
-        match args.subargs {
+        match &args.subargs {
             Some(SubArgs::Cookies {
                 no_heading, list_fields, fields, domain
             }) => {
-                cfg.no_heading = no_heading;
-                cfg.list_fields = list_fields;
-                cfg.domain = domain;
-                cfg.fields = fields; cfg
+                cfg.no_heading = *no_heading;
+                cfg.list_fields = *list_fields;
+                cfg.domain = domain.clone();
+                cfg.fields = fields.clone(); cfg
             }
             Some(SubArgs::Clean { whitelist, apply }) => {
                 cfg.clean = true;
-                cfg.apply = apply;
-                cfg.whitelist = whitelist; cfg
+                cfg.apply = *apply;
+                cfg.whitelist = whitelist.clone(); cfg
             }
             Some(SubArgs::Tui {}) => { cfg.tui = true; cfg }
             None => { cfg }

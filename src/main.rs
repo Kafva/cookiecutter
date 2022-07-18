@@ -23,7 +23,7 @@ use crate::tui::run;
 fn main() -> Result<(),()> {
     // Load command line configuration arguments into a global
     let args: Args = Args::parse();
-    let cfg = Config::from_args(args);
+    let cfg = Config::from_args(&args);
     CONFIG.set(cfg).unwrap();
     if Config::global().debug { eprintln!("{:#?}", Config::global()); }
 
@@ -36,8 +36,8 @@ fn main() -> Result<(),()> {
     let mut cookie_dbs: HashSet<CookieDB> = HashSet::new();
 
     // Parse a custom db if a --file was provided
-    if Config::global().file != "" {
-        let custom_db_path = path::PathBuf::try_from(&Config::global().file)
+    if args.file != "" {
+        let custom_db_path = path::PathBuf::try_from(&args.file)
                 .expect("Could not create PathBuf from provided --file");
         let typing = cookie_db_type(&custom_db_path.as_path())
                 .expect("Failed to determine database type of --file argument");
@@ -55,17 +55,17 @@ fn main() -> Result<(),()> {
 
 
     // Explicitly note if an invalid --profile was specified
-    if Config::global().profile != "" &&
+    if args.profile != "" &&
      !cookie_dbs.iter().any(|c|
       c.path.to_string_lossy().to_owned()
-        .contains(&Config::global().profile)
+        .contains(&args.profile)
     ) {
-        errln!("No profile matching '{}' found", Config::global().profile);
+        errln!("No profile matching '{}' found", args.profile);
         std::process::exit(Config::global().err_exit);
     }
 
 
-    if Config::global().list_profiles {
+    if args.list_profiles {
         infoln!("Profiles with a cookie database:");
         cookie_dbs.iter().for_each(|c| {
             println!("  {}", c.path_short());
@@ -84,9 +84,9 @@ fn main() -> Result<(),()> {
 
         for mut cookie_db in cookie_dbs {
             // Skip profiles if a specific --profile was passed
-            if Config::global().profile != "" &&
+            if args.profile != "" &&
              !cookie_db.path.to_string_lossy()
-              .contains(&Config::global().profile) {
+              .contains(&args.profile) {
                  continue;
             }
             // Skip profile headings if --no-heading
@@ -128,9 +128,9 @@ fn main() -> Result<(),()> {
 
         for cookie_db in cookie_dbs {
             // Skip profiles if a specific --profile was passed
-            if Config::global().profile != "" &&
+            if args.profile != "" &&
              !cookie_db.path.to_string_lossy()
-              .contains(&Config::global().profile) {
+              .contains(&args.profile) {
                  continue;
             }
             infoln!("Cleaning {}", cookie_db.path_short());
