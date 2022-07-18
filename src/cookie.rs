@@ -6,7 +6,7 @@ use crate::{COOKIE_FIELDS,ALL_FIELDS};
 use crate::config::ENCRYPTED_VALUE;
 
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct Cookie {
     /// The domain that created the cookie
     pub host: String,

@@ -6,11 +6,11 @@ use std::{
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     text::Span,
     style::{Color, Modifier, Style},
     widgets::{
-        Block, Borders, List, ListItem, Cell, Row, Table, 
+        Block, Borders, List, ListItem, Cell, Row, Table,
         BorderType, Paragraph
     },
     Frame, Terminal,
@@ -35,7 +35,7 @@ use crate::{
 };
 
 /// Entrypoint for the TUI
-pub fn run(cookie_dbs: &Vec<CookieDB>) -> Result<(),io::Error> {
+pub fn run(cookie_dbs: Vec<CookieDB>) -> Result<(),io::Error> {
     // Disable certain parts of the terminal's default behaviour
     //  https://docs.rs/crossterm/0.23.2/crossterm/terminal/index.html#raw-mode
     enable_raw_mode()?;
@@ -47,9 +47,9 @@ pub fn run(cookie_dbs: &Vec<CookieDB>) -> Result<(),io::Error> {
 
     let mut terminal = Terminal::new(backend)?;
     let tick_rate = Duration::from_millis(250);
-    let mut state = State::from_cookie_dbs(cookie_dbs);
+    let mut state = State::new(&cookie_dbs);
 
-    run_ui(&mut terminal, &mut state, tick_rate).unwrap();
+    run_ui(&mut terminal, &mut state, cookie_dbs, tick_rate).unwrap();
 
     // Restore default terminal behaviour
     disable_raw_mode()?;
@@ -64,6 +64,7 @@ pub fn run(cookie_dbs: &Vec<CookieDB>) -> Result<(),io::Error> {
 
 /// Application loop
 fn run_ui<B: Backend>(term: &mut Terminal<B>, state: &mut State,
+ mut cookie_dbs: Vec<CookieDB>,
  tick_rate: Duration) -> io::Result<()> {
     let mut last_tick = Instant::now();
 
@@ -73,7 +74,7 @@ fn run_ui<B: Backend>(term: &mut Terminal<B>, state: &mut State,
     }
 
     loop {
-        term.draw(|f| ui(f,state))?;
+        term.draw(|f| ui(f,state,&cookie_dbs))?;
 
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
@@ -83,12 +84,12 @@ fn run_ui<B: Backend>(term: &mut Terminal<B>, state: &mut State,
             if let Event::Key(key) = event::read()? {
                 if state.search_open {
                     //== Input mode ==//
-                    handle_search_key(key.code, state)
+                    handle_search_key(key.code, state, &cookie_dbs)
                 } else {
                     //== Normal mode ==//
                     match key.code {
                         KeyCode::Char('q') => return Ok(()),
-                        _ => handle_key(key.code, state)
+                        _ => handle_key(key.code, state, &mut cookie_dbs)
                     }
                 }
             }
@@ -99,7 +100,8 @@ fn run_ui<B: Backend>(term: &mut Terminal<B>, state: &mut State,
     }
 }
 
-fn handle_search_key(code: KeyCode, state: &mut State) {
+fn handle_search_key(code: KeyCode, state: &mut State,
+ cookie_dbs: &Vec<CookieDB>) {
     match code {
         KeyCode::Enter => {
             state.search_open = false;
@@ -109,12 +111,12 @@ fn handle_search_key(code: KeyCode, state: &mut State) {
             match state.selection {
                 Selection::Profiles => {
                     // Save all partial matches
-                    for (i,p) in state.cookie_dbs.iter().enumerate() {
+                    for (i,p) in cookie_dbs.iter().enumerate() {
                         if p.path.to_string_lossy().contains(&query) {
                             state.search_matches.push(i);
                         }
                     }
-                    debug_log(format!("Search matches: {:?}", 
+                    debug_log(format!("Search matches: {:?}",
                                       state.search_matches)
                     );
                     // Move selection to the first match (if any)
@@ -127,7 +129,7 @@ fn handle_search_key(code: KeyCode, state: &mut State) {
                 },
                 Selection::Domains => {
                     if set_matches(
-                        &state.current_domains.items, 
+                        &state.current_domains.items,
                         query,
                         &mut state.search_matches
                     ) {
@@ -139,7 +141,7 @@ fn handle_search_key(code: KeyCode, state: &mut State) {
                 },
                 Selection::Cookies => {
                     if set_matches(
-                        &state.current_cookies.items, 
+                        &state.current_cookies.items,
                         query,
                         &mut state.search_matches
                     ) {
@@ -166,7 +168,8 @@ fn handle_search_key(code: KeyCode, state: &mut State) {
 }
 
 /// Handle keyboard input
-fn handle_key(code: KeyCode, state: &mut State) {
+fn handle_key(code: KeyCode, 
+ state: &mut State, cookie_dbs: &mut Vec<CookieDB>) {
     match code {
         //== Deselect the current split ==//
         KeyCode::Left|KeyCode::Char('h') => {
@@ -183,7 +186,6 @@ fn handle_key(code: KeyCode, state: &mut State) {
                     state.selection = Selection::Domains;
                 }
             }
-
         },
         //== Go to next item in split ==//
         KeyCode::Down|KeyCode::Char('j') => {
@@ -247,9 +249,9 @@ fn handle_key(code: KeyCode, state: &mut State) {
         KeyCode::Char('n') => {
             if state.search_matches.len() > 0 {
                 // Wrap around if the last match has been reached
-                state.selected_match = 
+                state.selected_match =
                     if state.selected_match != state.search_matches.len()-1 {
-                        state.selected_match+1 
+                        state.selected_match+1
                     } else {
                         0
                     };
@@ -260,9 +262,9 @@ fn handle_key(code: KeyCode, state: &mut State) {
         KeyCode::Char('N') => {
             if state.search_matches.len() > 0 {
                 // Wrap around if the first match has been reached
-                state.selected_match = 
+                state.selected_match =
                     if state.selected_match != 0 {
-                        state.selected_match-1 
+                        state.selected_match-1
                     } else {
                         state.search_matches.len()-1
                     };
@@ -271,48 +273,89 @@ fn handle_key(code: KeyCode, state: &mut State) {
         },
         //== Delete cookie(s) ==//
         KeyCode::Char('D') => {
-            // Clear searches since any previously saved indices 
+            // Clear searches since any previously saved indices
             // will become incorrect
             state.search_matches.clear();
             state.selected_match = NO_SELECTION;
-
-            //if let Some(profile_idx) = state.profiles.status.selected() {
-            //    let cdb = state.cookie_dbs.get(profile_idx).unwrap();
-
-            //    cdb.delete_from_domain("wallhaven.cc","");
-            //}
-
-
-            //if let Some(profile_idx) = state.profiles.status.selected() {
-            //    //if let Some(cdb) = state.cookie_dbs.get_mut(profile_idx) {
-            //        if let Some(current_domain) = state.selected_domain() {
-            //            match state.selection {
-            //                // Remove all cookies from the current domain
-            //                Selection::Domains => {
-            //                    cdb.delete_from_domain(
-            //                        &current_domain, ""
-            //                    ).expect("Failed to delete cookies from domain")
-            //                },
-            //                // Remove a specific cookie from the current domain
-            //                Selection::Cookies => {
-            //                    if let Some(current_cookie) = 
-            //                     state.selected_cookie() {
-            //                        cdb.delete_from_domain(
-            //                            &current_domain, &current_cookie
-            //                        ).expect("Failed to delete cookie")
-            //                    }
-            //                },
-            //                _ => {  }
-            //            }
-            //        }
-            //    //}
-            //};
+            delete_in_current_split(state,cookie_dbs)
         },
         //== Copy value to clipboard ==//
         KeyCode::Char('C') => {
-            // pbcopy passthru 
+            // pbcopy passthru
         },
         _ => {  }
+    }
+}
+
+/// Delete the currently selected cookie if in the `Cookies` split
+/// and all cookies from a domain if inside the `Domains` split
+/// To update the internal cookie_db requires a mutable reference
+fn delete_in_current_split(state: &mut State, cookie_dbs: &mut Vec<CookieDB>) {
+    if let Some(profile_idx) = state.profiles.status.selected() {
+        if let Some(cdb) = cookie_dbs.get_mut(profile_idx) {
+            if let Some(current_domain) = state.selected_domain() {
+                match state.selection {
+                    // Remove all cookies from the current domain
+                    Selection::Domains => {
+                        debug_log(format!("Deleting: {current_domain}"));
+                        cdb.delete_from_domain(
+                            &current_domain, ""
+                        ).expect("Failed to delete cookies from domain");
+
+                        // If the removed item was the last domain,
+                        // unselect the domains split
+                        if state.current_domains.items.len() <= 1 {
+                            state.current_domains.status.select(None)
+                        }
+                        // The selected() index needs to be decremented
+                        // in case we removed that last item
+                        else {
+                            let curr = state.current_domains.status
+                                .selected().unwrap();
+                            if curr != 0 {
+                                state.current_domains.status
+                                    .select(Some(curr-1));
+                            }
+                        }
+                    },
+                    // Remove a specific cookie from the current domain
+                    Selection::Cookies => {
+                        if let Some(current_cookie) =
+                         state.selected_cookie() {
+                            debug_log(format!(
+                                "Deleting: {current_domain}.{current_cookie}"
+                            ));
+                            cdb.delete_from_domain(
+                                &current_domain, &current_cookie
+                            ).expect("Failed to delete cookie");
+
+                            // If the removed item was the last cookie,
+                            // unselect the cookie split
+                            if state.current_cookies.items.len() <= 1 {
+                                state.current_cookies.status.select(None);
+                                // If the domain split could also become empty
+                                // from the deletion operation, select profiles
+                                if state.current_domains.items.len() <= 1 {
+                                    state.current_domains.status.select(None)
+                                }
+                            }
+                            // The selected() index needs to be decremented
+                            // in case we removed that last item
+                            else {
+                                let curr = state.current_cookies.status
+                                    .selected().unwrap();
+                                if curr != 0 {
+                                    state.current_cookies.status
+                                        .select(Some(curr-1));
+                                }
+                            }
+
+                        }
+                    },
+                    _ => {  }
+                }
+            }
+        }
     }
 }
 
@@ -341,7 +384,7 @@ fn select_match_in_current_split(state: &mut State){
 
 /// Save all partial matches of the query to `search_matches` and
 /// return true if at least one match was found
-fn set_matches(items: &Vec<&str>, q: String, search_matches: &mut Vec<usize>)
+fn set_matches(items: &Vec<String>, q: String, search_matches: &mut Vec<usize>)
  -> bool {
     for (i,p) in items.iter().enumerate() {
         if p.contains(&q) {
@@ -361,13 +404,13 @@ fn set_matches(items: &Vec<&str>, q: String, search_matches: &mut Vec<usize>)
 ///  |0       |1      |2           |3         |
 ///  |profiles|domains|cookie names|field_list|
 ///
-fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
+fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State, cookie_dbs: &Vec<CookieDB>) {
     // == Layout ==//
     // Split the frame vertically into a body and footer
     let vert_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(98), 
+            Constraint::Percentage(98),
             Constraint::Percentage(2)]
         .as_ref())
         .split(frame.size());
@@ -385,26 +428,14 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 
     if state.search_open {
         //== Render the search input ==//
-        let input_box = Paragraph::new(
-           format!("{} {}", TUI_SEARCH, state.search_field)
-        ).style(Style::default().fg(Color::Blue));
-
-        frame.render_widget(input_box, vert_chunks[1]);
-        frame.set_cursor(
-            // Put cursor past the end of the input text
-            vert_chunks[1].x + 
-                TUI_SEARCH.len() as u16 + 
-                state.search_field.len() as u16 + 
-                1,
-            vert_chunks[1].y,
-        );
+        render_search(frame, state, vert_chunks[1])
     } else {
         //== Render the footer ==//
-        frame.render_widget(create_footer(), vert_chunks[1]);
+        frame.render_widget(create_footer(), vert_chunks[1])
     }
 
     // Determine which splits should be rendered
-    let (profiles_idx, domains_idx, cookies_idx, fields_idx) = 
+    let (profiles_idx, domains_idx, cookies_idx, fields_idx) =
         if matches!(state.selection, Selection::Cookies) {
             (NO_SELECTION,0,1,2)
         } else {
@@ -413,11 +444,11 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 
     if profiles_idx != NO_SELECTION {
         //== Profiles ==//
-        let profile_items: Vec<ListItem> = 
+        let profile_items: Vec<ListItem> =
             create_list_items(&state.profiles.items);
 
-        let profile_list =  add_highlight( 
-            create_list(profile_items, 
+        let profile_list =  add_highlight(
+            create_list(profile_items,
                 "Profiles".to_string(), Borders::NONE
             )
         );
@@ -430,7 +461,7 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 
     //== Domains ==//
     if let Some(profile_idx) = state.profiles.status.selected() {
-        if let Some(cdb) = state.cookie_dbs.get(profile_idx) {
+        if let Some(cdb) = cookie_dbs.get(profile_idx) {
             // Fill the current_domains state list
             state.current_domains.items = cdb.domains();
 
@@ -442,30 +473,30 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
 
             //== Render domains ==//
             frame.render_stateful_widget(
-                domain_list, chunks[domains_idx], 
+                domain_list, chunks[domains_idx],
                 &mut state.current_domains.status
             );
 
             //== Cookies ==//
             if let Some(current_domain) = state.selected_domain() {
                 // Fill the current_cookies state list
-                state.current_cookies.items = 
+                state.current_cookies.items =
                     cdb.cookies_for_domain(&current_domain).iter()
-                        .map(|c| c.name.as_str() ).collect();
+                        .map(|c| c.name.to_owned() ).collect();
 
                 let cookies_items = create_list_items(
                     &state.current_cookies.items
                 );
 
                 let cookies_list = add_highlight(
-                    create_list(cookies_items, 
+                    create_list(cookies_items,
                         "Cookies".to_string(),
                         Borders::NONE
                 ));
 
                 //== Render cookies ==//
                 frame.render_stateful_widget(
-                    cookies_list, chunks[cookies_idx], 
+                    cookies_list, chunks[cookies_idx],
                     &mut state.current_cookies.status
                 );
 
@@ -489,7 +520,7 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
                         ];
 
                         // Create list items for the UI
-                        let fields_items: Vec<ListItem> = 
+                        let fields_items: Vec<ListItem> =
                             create_list_items(&state.current_fields.items);
 
                         let fields_list = create_list(
@@ -499,7 +530,7 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
                         if fields_idx != NO_SELECTION {
                             //== Render fields ==//
                             frame.render_stateful_widget(
-                                fields_list, chunks[fields_idx], 
+                                fields_list, chunks[fields_idx],
                                 &mut state.current_fields.status
                             );
                             if state.current_fields.items.len() > 0 {
@@ -528,6 +559,23 @@ fn create_list_items<T: ToString>(items: &Vec<T>) -> Vec<ListItem> {
     }).collect()
 }
 
+fn render_search<B: Backend>(
+ frame: &mut Frame<B>, state: &mut State, vert_chunk: Rect) {
+    let input_box = Paragraph::new(
+       format!("{} {}", TUI_SEARCH, state.search_field)
+    ).style(Style::default().fg(Color::Blue));
+
+    frame.render_widget(input_box, vert_chunk);
+    frame.set_cursor(
+        // Put cursor past the end of the input text
+        vert_chunk.x +
+            TUI_SEARCH.len() as u16 +
+            state.search_field.len() as u16 +
+            1,
+        vert_chunk.y,
+    );
+}
+
 /// Create the usage footer
 fn create_footer() -> Table<'static> {
     let cells = [
@@ -536,7 +584,7 @@ fn create_footer() -> Table<'static> {
         Cell::from("n/N: Next/Previous match"),
         Cell::from("D: Delete")
             .style(Style::default().fg(Color::LightRed)),
-        Cell::from("C: Copy")
+        Cell::from("C: Copy to clipboard")
             .style(Style::default().fg(Color::LightYellow)),
         Cell::from("q: Quit")
     ];
@@ -548,7 +596,7 @@ fn create_footer() -> Table<'static> {
             Constraint::Percentage(7),
             Constraint::Percentage(15),
             Constraint::Percentage(7),
-            Constraint::Percentage(7),
+            Constraint::Percentage(12),
             Constraint::Percentage(7),
         ])
 }
@@ -567,7 +615,7 @@ fn create_list(items: Vec<ListItem>, title: String, border: Borders) -> List {
     List::new(items)
         .block(
             Block::default().border_type(BorderType::Rounded).borders(border)
-            .title(Span::styled(title, 
+            .title(Span::styled(title,
                     Style::default().fg(Color::Indexed(TUI_PRIMARY_COLOR))
                         .add_modifier(Modifier::UNDERLINED|Modifier::BOLD)
                 )

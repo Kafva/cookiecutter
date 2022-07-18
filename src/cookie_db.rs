@@ -215,17 +215,21 @@ impl CookieDB {
     }
 
     /// Deduplicated list of domains stored in the database
-    pub fn domains(&self) -> Vec<&str> {
-        let mut hst_names: Vec<&str> =
-            self.cookies.iter().map(|c| c.host.as_str()).collect();
+    /// Returns a new `String` to dodge BC
+    pub fn domains(&self) -> Vec<String> {
+        let mut hst_names: Vec<String> =
+            self.cookies.iter().map(|c| c.host.to_owned() ).collect();
         hst_names.sort();
         hst_names.dedup();
         hst_names
     }
 
     /// List of cookies for a specific domain
-    pub fn cookies_for_domain(&self, domain: &String) -> Vec<&Cookie> {
-         self.cookies.iter().filter(|c| c.host == *domain).collect()
+    /// To return a non-reference list of cookies requires that
+    /// `Cookie` implements the copy trait
+    pub fn cookies_for_domain(&self, domain: &String) -> Vec<Cookie> {
+         self.cookies.iter().filter(|c| c.host == *domain)
+             .map(|c| c.to_owned() ).collect()
     }
 
     /// Return a cookie with a specific name from a specific domain

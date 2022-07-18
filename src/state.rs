@@ -49,7 +49,7 @@ pub enum Selection {
 }
 
 /// The main struct which holds the global state of the TUI
-pub struct State<'a> {
+pub struct State {
     /// The currently selected element
     pub selection: Selection, 
 
@@ -65,17 +65,17 @@ pub struct State<'a> {
     // We we only keep the domains for the currently seleceted profile
     // in a StatefulList. If a domain is removed, we will update the
     // underlying CookieDB and reload
-    pub cookie_dbs: &'a Vec<CookieDB>,
+    // pub cookie_dbs: Vec<CookieDB>,
 
     pub profiles:        StatefulList<String>,
-    pub current_domains: StatefulList<&'a str>,
-    pub current_cookies: StatefulList<&'a str>,
+    pub current_domains: StatefulList<String>,
+    pub current_cookies: StatefulList<String>,
     pub current_fields:  StatefulList<String>
 }
 
-impl<'a> State<'a> {
+impl State {
     /// Create a TUI state object from a vector of cookie databases
-    pub fn from_cookie_dbs(cookie_dbs: &Vec<CookieDB>) -> State {
+    pub fn new(cookie_dbs: &Vec<CookieDB>) -> State {
         // The profiles list will never change after launch
         let profiles = StatefulList {
             status: ListState::default(),
@@ -93,7 +93,6 @@ impl<'a> State<'a> {
             current_domains: StatefulList::default(), 
             current_cookies: StatefulList::default(), 
             current_fields:  StatefulList::default(),
-            cookie_dbs
         }
     }
 
@@ -101,7 +100,9 @@ impl<'a> State<'a> {
     pub fn selected_domain(&self) -> Option<String> {
         if let Some(selected_idx) = self.current_domains.status.selected() {
             // Convert to String to dodge BC
-            Some(String::from(*self.current_domains.items.get(selected_idx).unwrap()))
+            let s = self.current_domains.items.get(selected_idx)
+                .expect("No domain found for `selected()` index");
+            Some(s.to_owned())
         } else {
             None
         }
@@ -111,7 +112,9 @@ impl<'a> State<'a> {
     pub fn selected_cookie(&self) -> Option<String> {
         if let Some(selected_idx) = self.current_cookies.status.selected() {
             // Convert to String to dodge BC
-            Some(String::from(*self.current_cookies.items.get(selected_idx).unwrap()))
+            let c = self.current_cookies.items.get(selected_idx)
+                .expect("No cookie found for `selected()` index");
+            Some(c.to_owned())
         } else {
             None
         }
