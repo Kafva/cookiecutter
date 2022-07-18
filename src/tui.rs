@@ -108,16 +108,22 @@ fn handle_search_key(code: KeyCode, state: &mut State) {
 
             match state.selection {
                 Selection::Profiles => {
-                    //TODO
                     // Save all partial matches
                     for (i,p) in state.cookie_dbs.iter().enumerate() {
                         if p.path.to_string_lossy().contains(&query) {
                             state.search_matches.push(i);
                         }
                     }
+                    debug_log(format!("Search matches: {:?}", 
+                                      state.search_matches)
+                    );
                     // Move selection to the first match (if any)
-                    let first_match = state.search_matches.pop();
-                    state.profiles.status.select(first_match)
+                    if state.search_matches.len() > 0 {
+                        state.selected_match = 0;
+                        state.profiles.status.select(
+                            Some(*state.search_matches.get(0).unwrap())
+                        );
+                    }
                 },
                 Selection::Domains => {
                     if set_matches(
