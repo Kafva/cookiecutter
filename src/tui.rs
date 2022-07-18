@@ -27,7 +27,8 @@ use crate::{
         NO_SELECTION,
         TUI_PRIMARY_COLOR,
         TUI_TEXT_TRUNCATE_LIM,
-        TUI_SEARCH
+        TUI_SEARCH,
+        Config
     },
     cookie_db::CookieDB,
     state::{State,Selection}
@@ -98,20 +99,6 @@ fn run_ui<B: Backend>(term: &mut Terminal<B>, state: &mut State,
     }
 }
 
-/// Save all partial matches of the query to `search_matches` and
-/// return the index of the first match (if any)
-fn set_matches(items: &Vec<&str>, q: String, search_matches: &mut Vec<usize>)
- -> Option<usize> {
-    for (i,p) in items.iter().enumerate() {
-        if p.contains(&q) {
-            search_matches.push(i);
-        }
-    }
-    // We want to pop the first match first
-    search_matches.reverse();
-    search_matches.pop()
-}
-
 fn handle_search_key(code: KeyCode, state: &mut State) {
     match code {
         KeyCode::Enter => {
@@ -121,6 +108,7 @@ fn handle_search_key(code: KeyCode, state: &mut State) {
 
             match state.selection {
                 Selection::Profiles => {
+                    //TODO
                     // Save all partial matches
                     for (i,p) in state.cookie_dbs.iter().enumerate() {
                         if p.path.to_string_lossy().contains(&query) {
@@ -132,20 +120,28 @@ fn handle_search_key(code: KeyCode, state: &mut State) {
                     state.profiles.status.select(first_match)
                 },
                 Selection::Domains => {
-                    let first_match = set_matches(
+                    if set_matches(
                         &state.current_domains.items, 
                         query,
                         &mut state.search_matches
-                    );
-                    state.current_domains.status.select(first_match);
+                    ) {
+                        state.selected_match = 0;
+                        state.current_domains.status.select(
+                            Some(*state.search_matches.get(0).unwrap())
+                        );
+                    }
                 },
                 Selection::Cookies => {
-                    let first_match = set_matches(
+                    if set_matches(
                         &state.current_cookies.items, 
                         query,
                         &mut state.search_matches
-                    );
-                    state.current_cookies.status.select(first_match);
+                    ) {
+                        state.selected_match = 0;
+                        state.current_cookies.status.select(
+                            Some(*state.search_matches.get(0).unwrap())
+                        );
+                    }
                 }
             }
         }
@@ -161,7 +157,6 @@ fn handle_search_key(code: KeyCode, state: &mut State) {
         }
         _ => {  }
     }
-
 }
 
 /// Handle keyboard input
@@ -173,10 +168,12 @@ fn handle_key(code: KeyCode, state: &mut State) {
                 Selection::Profiles => {  }
                 Selection::Domains => {
                     state.current_domains.status.select(None);
+                    state.search_matches.clear();
                     state.selection = Selection::Profiles;
                 }
                 Selection::Cookies => {
                     state.current_cookies.status.select(None);
+                    state.search_matches.clear();
                     state.selection = Selection::Domains;
                 }
             }
@@ -216,36 +213,102 @@ fn handle_key(code: KeyCode, state: &mut State) {
                Selection::Profiles => {
                     if state.current_domains.items.len() > 0 {
                         state.current_domains.status.select(Some(0));
+                        state.search_matches.clear();
+                        state.selected_match = NO_SELECTION;
                         state.selection = Selection::Domains;
                     }
                },
                Selection::Domains => {
                     if state.current_cookies.items.len() > 0 {
                         state.current_cookies.status.select(Some(0));
+                        state.search_matches.clear();
+                        state.selected_match = NO_SELECTION;
                         state.selection = Selection::Cookies;
                     }
                }
                Selection::Cookies => {
                     // The `state.current_fields.items` array is empty
                     // until the next ui() tick.
+                    // This branch is needed to make the `match` exhaustive.
                }
            }
         },
         //== Select field through search ==//
         KeyCode::Char('/') => {
-            // 1. Read input (input box should hide the controls)
-            // 2. Move selection to first match in current split
             state.search_open = true
+        },
+        //== Go to next match (if any) ==//
+        KeyCode::Char('n') => {
+            if state.search_matches.len() > 0 {
+                // Wrap around if the last match has been reached
+                state.selected_match = 
+                    if state.selected_match != state.search_matches.len()-1 {
+                        state.selected_match+1 
+                    } else {
+                        0
+                    };
+                select_match_in_current_split(state)
+            }
+        },
+        //== Go to previous match (if any) ==//
+        KeyCode::Char('N') => {
+            if state.search_matches.len() > 0 {
+                // Wrap around if the first match has been reached
+                state.selected_match = 
+                    if state.selected_match != 0 {
+                        state.selected_match-1 
+                    } else {
+                        state.search_matches.len()-1
+                    };
+                select_match_in_current_split(state)
+            }
         },
         //== Delete cookie(s) ==//
         KeyCode::Char('D') => {
             // Deleteion message should cover controls
+            // clear() searches after a deletion
         },
         //== Copy value to clipboard ==//
         KeyCode::Char('C') => {
         },
         _ => {  }
     }
+}
+
+/// The `selected_match` is an index in the `search_matches` array, the
+/// `search_matches` array contains the indices in the actual list.
+fn select_match_in_current_split(state: &mut State){
+    let list_idx = state.search_matches.get(state.selected_match)
+        .expect("Invalid index specified for `search_matches`");
+
+    debug_log(format!(
+        "Selecting match[{}] -> list[{}]", state.selected_match, list_idx)
+    );
+
+    match state.selection {
+        Selection::Profiles => {
+            state.profiles.status.select(Some(*list_idx))
+        },
+        Selection::Domains => {
+            state.current_domains.status.select(Some(*list_idx))
+        },
+        Selection::Cookies => {
+            state.current_cookies.status.select(Some(*list_idx))
+        }
+    }
+}
+
+/// Save all partial matches of the query to `search_matches` and
+/// return true if at least one match was found
+fn set_matches(items: &Vec<&str>, q: String, search_matches: &mut Vec<usize>)
+ -> bool {
+    for (i,p) in items.iter().enumerate() {
+        if p.contains(&q) {
+            search_matches.push(i);
+        }
+    }
+    debug_log(format!("Search matches: {:?}", search_matches));
+    search_matches.len() != 0
 }
 
 /// Render the UI, called on each tick.
@@ -258,7 +321,6 @@ fn handle_key(code: KeyCode, state: &mut State) {
 ///  |profiles|domains|cookie names|field_list|
 ///
 fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
-
     // Split the frame vertically into a body and footer
     let vert_chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -286,6 +348,14 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
         ).style(Style::default().fg(Color::Blue));
 
         frame.render_widget(input_box, vert_chunks[1]);
+        frame.set_cursor(
+            // Put cursor past the end of the input text
+            vert_chunks[1].x + 
+                TUI_SEARCH.len() as u16 + 
+                state.search_field.len() as u16 + 
+                1,
+            vert_chunks[1].y,
+        );
     } else {
         //== Render the footer ==//
         frame.render_widget(create_footer(), vert_chunks[1]);
@@ -421,16 +491,20 @@ fn create_footer() -> Table<'static> {
     let cells = [
         Cell::from("/: Search")
             .style(Style::default().fg(Color::LightBlue)),
+        Cell::from("n/N: Next/Previous match"),
         Cell::from("D: Delete")
             .style(Style::default().fg(Color::LightRed)),
         Cell::from("C: Copy")
-            .style(Style::default().fg(Color::LightYellow))
+            .style(Style::default().fg(Color::LightYellow)),
+        Cell::from("q: Quit")
     ];
 
     let row = Row::new(cells).bottom_margin(1);
     Table::new(vec![row])
         .block(Block::default().borders(Borders::NONE))
         .widths(&[
+            Constraint::Percentage(7),
+            Constraint::Percentage(15),
             Constraint::Percentage(7),
             Constraint::Percentage(7),
             Constraint::Percentage(7),
@@ -462,12 +536,14 @@ fn create_list(items: Vec<ListItem>, title: String, border: Borders) -> List {
 /// Print a debug message to `DEBUG_LOG`
 #[allow(dead_code)]
 fn debug_log<T: std::fmt::Display>(msg: T) {
-    let mut f = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(DEBUG_LOG)
-        .unwrap();
+    if Config::global().debug {
+        let mut f = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(DEBUG_LOG)
+            .unwrap();
 
-    writeln!(f,"-> {msg}").expect("Failed to write debug message");
+        writeln!(f,"-> {msg}").expect("Failed to write debug message");
+    }
 }
 

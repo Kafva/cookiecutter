@@ -1,6 +1,7 @@
 use tui::widgets::ListState;
 
 use crate::cookie_db::CookieDB;
+use crate::config::NO_SELECTION;
 
 pub struct StatefulList<T> {
     pub status: ListState,
@@ -54,8 +55,12 @@ pub struct State<'a> {
 
     pub search_open: bool,
     pub search_field: String,
+
     /// Indices of all matches from a '/' search
     pub search_matches: Vec<usize>,
+
+    /// The index in the search results
+    pub selected_match: usize,
 
     // We we only keep the domains for the currently seleceted profile
     // in a StatefulList. If a domain is removed, we will update the
@@ -83,6 +88,7 @@ impl<'a> State<'a> {
             search_open: false,
             search_field: "".to_string(),
             search_matches: vec![],
+            selected_match: NO_SELECTION,
             profiles, 
             current_domains: StatefulList::default(), 
             current_cookies: StatefulList::default(), 

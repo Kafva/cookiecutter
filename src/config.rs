@@ -95,7 +95,7 @@ enum SubArgs {
   about = "CLI cookie manager for Firefox and Chromium")]
 /// https://github.com/clap-rs/clap/blob/v3.2.7/examples/derive_ref/README.md#arg-attributes
 pub struct Args {
-    /// Output debugging information
+    /// Output debugging information, writes to `rokie.log` when TUI is active
     #[clap(short, long)]
     debug: bool,
 
