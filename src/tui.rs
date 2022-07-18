@@ -271,11 +271,46 @@ fn handle_key(code: KeyCode, state: &mut State) {
         },
         //== Delete cookie(s) ==//
         KeyCode::Char('D') => {
-            // Deleteion message should cover controls
-            // clear() searches after a deletion
+            // Clear searches since any previously saved indices 
+            // will become incorrect
+            state.search_matches.clear();
+            state.selected_match = NO_SELECTION;
+
+            //if let Some(profile_idx) = state.profiles.status.selected() {
+            //    let cdb = state.cookie_dbs.get(profile_idx).unwrap();
+
+            //    cdb.delete_from_domain("wallhaven.cc","");
+            //}
+
+
+            //if let Some(profile_idx) = state.profiles.status.selected() {
+            //    //if let Some(cdb) = state.cookie_dbs.get_mut(profile_idx) {
+            //        if let Some(current_domain) = state.selected_domain() {
+            //            match state.selection {
+            //                // Remove all cookies from the current domain
+            //                Selection::Domains => {
+            //                    cdb.delete_from_domain(
+            //                        &current_domain, ""
+            //                    ).expect("Failed to delete cookies from domain")
+            //                },
+            //                // Remove a specific cookie from the current domain
+            //                Selection::Cookies => {
+            //                    if let Some(current_cookie) = 
+            //                     state.selected_cookie() {
+            //                        cdb.delete_from_domain(
+            //                            &current_domain, &current_cookie
+            //                        ).expect("Failed to delete cookie")
+            //                    }
+            //                },
+            //                _ => {  }
+            //            }
+            //        }
+            //    //}
+            //};
         },
         //== Copy value to clipboard ==//
         KeyCode::Char('C') => {
+            // pbcopy passthru 
         },
         _ => {  }
     }
@@ -327,6 +362,7 @@ fn set_matches(items: &Vec<&str>, q: String, search_matches: &mut Vec<usize>)
 ///  |profiles|domains|cookie names|field_list|
 ///
 fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State) {
+    // == Layout ==//
     // Split the frame vertically into a body and footer
     let vert_chunks = Layout::default()
         .direction(Direction::Vertical)

@@ -169,6 +169,50 @@ impl CookieDB {
         Ok(())
     }
 
+    /// Delete a cookie with a specific name from a domain or
+    /// ALL cookies from a domain if no name is specified.
+    /// This call updates both the SQLite store and the
+    /// internal `cookies` vector.
+    pub fn delete_from_domain(&mut self, domain: &str, name: &str)
+     -> Result<(), rusqlite::Error> {
+        let field_idx = if self.typing==DbType::Chrome {0} else {1};
+
+        let query = if name.is_empty() {
+            format!(
+                "DELETE FROM {} WHERE {} == \"{}\";",
+                self.table_name(),
+                COOKIE_FIELDS["Host"][field_idx],
+                domain
+            )
+        } else {
+            format!(
+                "DELETE FROM {} WHERE {} == \"{}\" AND {} == \"{}\";",
+                self.table_name(),
+                COOKIE_FIELDS["Host"][field_idx],
+                domain,
+                COOKIE_FIELDS["Name"][field_idx],
+                name
+            )
+        };
+
+        // Remove from backing store
+        let conn = rusqlite::Connection::open(&self.path)?;
+        conn.execute(&query, rusqlite::params![])?;
+        conn.close().unwrap();
+
+        // Remove from entries from the internal vector
+        if name.is_empty(){
+            self.cookies = self.cookies.drain_filter(|c|
+                                c.host == domain
+                            ).collect()
+        } else {
+            self.cookies = self.cookies.drain_filter(|c|
+                                c.host == domain && c.name == name
+                            ).collect()
+        }
+
+        Ok(())
+    }
 
     /// Deduplicated list of domains stored in the database
     pub fn domains(&self) -> Vec<&str> {
@@ -185,7 +229,7 @@ impl CookieDB {
     }
 
     /// Return a cookie with a specific name from a specific domain
-    pub fn cookie_for_domain(&self, name: &String, domain: &String) 
+    pub fn cookie_for_domain(&self, name: &String, domain: &String)
      -> Option<&Cookie> {
          self.cookies.iter().find(|c| c.host == *domain && c.name == *name)
     }

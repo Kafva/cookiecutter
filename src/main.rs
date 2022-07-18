@@ -1,3 +1,5 @@
+#![feature(drain_filter)]
+
 use std::collections::HashSet;
 use std::path;
 
