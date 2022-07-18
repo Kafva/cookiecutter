@@ -96,6 +96,18 @@ impl State {
         }
     }
 
+    /// The currently selected profile 
+    pub fn selected_profile(&self) -> Option<String> {
+        if let Some(selected_idx) = self.profiles.status.selected() {
+            // Convert to String to dodge BC
+            let s = self.profiles.items.get(selected_idx)
+                .expect("No profile found for `selected()` index");
+            Some(s.to_owned())
+        } else {
+            None
+        }
+    }
+
     /// The currently selected domain (if any)
     pub fn selected_domain(&self) -> Option<String> {
         if let Some(selected_idx) = self.current_domains.status.selected() {
@@ -119,6 +131,5 @@ impl State {
             None
         }
     }
-
 }
 

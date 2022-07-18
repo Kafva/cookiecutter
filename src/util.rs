@@ -1,8 +1,13 @@
-use std::io::{Read,BufRead}; // Enables the use of .read_exact()
 use std::io;
-use std::fs::File;
-use std::path::Path;
-use std::collections::HashSet;
+use std::{
+    env::consts,
+    io::{Read,BufRead,Write},
+    fs::File,
+    path::Path,
+    collections::HashSet,
+    process::{Command,Stdio}
+};
+
 use walkdir::WalkDir;
 
 use sysinfo::{System, SystemExt, RefreshKind};
@@ -135,6 +140,29 @@ pub fn parse_whitelist(filepath: &Path) -> Result<Vec<String>,io::Error> {
        line = "".to_string();
     }
     Ok(whitelist)
+}
+
+/// Only applies if `SSH_CONNECTION` is unset.
+/// Utilises `xsel` on Linux/BSD.
+pub fn copy_to_clipboard(content: String) -> Result<(), io::Error> {
+    if std::env::var("SSH_CONNECTION").is_ok() { return Ok(()); }
+    match consts::OS {
+        "macos" => {
+            let mut p = Command::new("/usr/bin/pbcopy")
+                .stdin(Stdio::piped()).spawn()?;
+
+            p.stdin.as_mut().unwrap().write_all(content.as_bytes())
+        },
+        "linux"|"freebsd" => {
+            if std::env::var("DISPLAY").is_ok() {  
+                let mut p = Command::new("xsel").args(["-i","-b"])
+                    .stdin(Stdio::piped()).spawn()?;
+
+                p.stdin.as_mut().unwrap().write_all(content.as_bytes())
+            } else {  Ok(()) }
+        }
+        _ => { Ok(()) }
+    }
 }
 
 #[cfg(test)]

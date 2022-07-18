@@ -200,15 +200,11 @@ impl CookieDB {
         conn.execute(&query, rusqlite::params![])?;
         conn.close().unwrap();
 
-        // Remove from entries from the internal vector
+        // Retain all except the removed entries
         if name.is_empty(){
-            self.cookies = self.cookies.drain_filter(|c|
-                                c.host == domain
-                            ).collect()
+            self.cookies.retain(|c| c.host != domain)
         } else {
-            self.cookies = self.cookies.drain_filter(|c|
-                                c.host == domain && c.name == name
-                            ).collect()
+            self.cookies.retain(|c| c.host != domain && c.name != name)
         }
 
         Ok(())

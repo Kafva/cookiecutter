@@ -31,7 +31,8 @@ use crate::{
         Config
     },
     cookie_db::CookieDB,
-    state::{State,Selection}
+    state::{State,Selection},
+    util::copy_to_clipboard
 };
 
 /// Entrypoint for the TUI
@@ -281,7 +282,25 @@ fn handle_key(code: KeyCode,
         },
         //== Copy value to clipboard ==//
         KeyCode::Char('C') => {
-            // pbcopy passthru
+            match state.selection {
+                Selection::Profiles => {
+                    // Copy the path to the current profile
+                    copy_to_clipboard(state.selected_profile().unwrap())
+                        .expect("Clipboard copy failed");
+                },
+                Selection::Domains => {
+                    // Copy the name of the current domain
+                    copy_to_clipboard(state.selected_domain().unwrap())
+                        .expect("Clipboard copy failed");
+                },
+                Selection::Cookies => {
+                    // Copy the 'Value' field of the current cookie
+                    let value = state.current_fields.items
+                        .first().unwrap().strip_prefix("Value: ");
+                    copy_to_clipboard(value.unwrap().to_string())
+                        .expect("Clipboard copy failed");
+                }
+            }
         },
         _ => {  }
     }
@@ -320,8 +339,7 @@ fn delete_in_current_split(state: &mut State, cookie_dbs: &mut Vec<CookieDB>) {
                     },
                     // Remove a specific cookie from the current domain
                     Selection::Cookies => {
-                        if let Some(current_cookie) =
-                         state.selected_cookie() {
+                        if let Some(current_cookie) = state.selected_cookie() {
                             debug_log(format!(
                                 "Deleting: {current_domain}.{current_cookie}"
                             ));
@@ -333,10 +351,12 @@ fn delete_in_current_split(state: &mut State, cookie_dbs: &mut Vec<CookieDB>) {
                             // unselect the cookie split
                             if state.current_cookies.items.len() <= 1 {
                                 state.current_cookies.status.select(None);
+                                state.selection = Selection::Domains;
                                 // If the domain split could also become empty
                                 // from the deletion operation, select profiles
                                 if state.current_domains.items.len() <= 1 {
-                                    state.current_domains.status.select(None)
+                                    state.current_domains.status.select(None);
+                                    state.selection = Selection::Profiles;
                                 }
                             }
                             // The selected() index needs to be decremented
@@ -347,6 +367,9 @@ fn delete_in_current_split(state: &mut State, cookie_dbs: &mut Vec<CookieDB>) {
                                 if curr != 0 {
                                     state.current_cookies.status
                                         .select(Some(curr-1));
+                                    debug_log(format!(
+                                        "Selecting cookie: {}", curr-1
+                                    ))
                                 }
                             }
 
@@ -404,7 +427,8 @@ fn set_matches(items: &Vec<String>, q: String, search_matches: &mut Vec<usize>)
 ///  |0       |1      |2           |3         |
 ///  |profiles|domains|cookie names|field_list|
 ///
-fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State, cookie_dbs: &Vec<CookieDB>) {
+fn ui<B: Backend>(frame: &mut Frame<B>, state: 
+ &mut State, cookie_dbs: &Vec<CookieDB>) {
     // == Layout ==//
     // Split the frame vertically into a body and footer
     let vert_chunks = Layout::default()
@@ -501,6 +525,10 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut State, cookie_dbs: &Vec<Cook
                 );
 
                 //== Fields ==//
+                //debug_log(format!("Crash {:?} {:?} ",
+                //        state.current_cookies.items,  
+                //        state.current_cookies.status.selected()
+                //));
                 if let Some(current_cookie) = state.selected_cookie() {
                     if let Some(cookie) = cdb
                         .cookie_for_domain(
