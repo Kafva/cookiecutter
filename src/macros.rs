@@ -8,7 +8,6 @@ macro_rules! msg_prefix {
         }
     )
 }
-
 #[macro_export]
 macro_rules! errln {
     // Match a fmt literal + one or more expressions
@@ -24,7 +23,6 @@ macro_rules! errln {
 }
 #[macro_export]
 macro_rules! infoln {
-    // Match a fmt literal + one or more expressions
     ( $fmt:literal, $($x:expr),* ) => (
         msg_prefix!("94");
         eprintln!($fmt, $($x)*);
@@ -37,14 +35,12 @@ macro_rules! infoln {
 }
 #[macro_export]
 macro_rules! debugln {
-    // Match a fmt literal + one or more expressions
     ( $fmt:literal, $($x:expr),* ) => (
         if Config::global().debug {
             msg_prefix!("94");
             eprintln!($fmt, $($x)*);
         }
     );
-    // Match one or more expressions without a literal
     ( $($x:expr),* ) => (
         if Config::global().debug {
             msg_prefix!("94");

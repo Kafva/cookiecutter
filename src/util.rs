@@ -2,7 +2,7 @@ use std::io;
 use std::{
     env::consts,
     io::{Read,BufRead,Write},
-    fs::File,
+    fs::{File,OpenOptions},
     path::Path,
     collections::HashSet,
     process::{Command,Stdio}
@@ -13,7 +13,7 @@ use walkdir::WalkDir;
 use sysinfo::{System, SystemExt, RefreshKind};
 
 use crate::cookie_db::CookieDB;
-use crate::config::{SEARCH_DIRS,DB_NAMES};
+use crate::config::{SEARCH_DIRS,DB_NAMES,SQLITE_FILE_ID};
 
 /// The PartialEq trait allows us to use `matches!` to check
 /// equality between enums
@@ -28,7 +28,7 @@ pub fn get_home() -> String {
         format!("/mnt/c/Users/{}", std::env::var("USER").unwrap())
     } else {
         std::env::var("HOME").unwrap()
-    }
+   }
 }
 
 /// Check if a process is running using the `sysinfo` library
@@ -49,9 +49,7 @@ pub fn process_is_running(name: &str) -> bool {
 
 fn is_db_with_table(conn: &rusqlite::Connection, table_name: &str) -> bool {
     return conn.query_row::<u32,_,_>(
-        &format!("SELECT 1 FROM {table_name} LIMIT 1"),
-        [],
-        |row|row.get(0)
+        &format!("SELECT 1 FROM {table_name} LIMIT 1"),[], |row|row.get(0)
     ).is_ok();
 }
 
@@ -91,19 +89,15 @@ pub fn cookie_dbs_from_profiles(cookie_dbs: &mut HashSet<CookieDB>) {
 pub fn cookie_db_type(filepath:&Path) -> Result<DbType,io::Error> {
     let mut f = File::open(filepath)?;
     let mut buf = [0; 15];
-
     f.read_exact(&mut buf)?;
 
-    for (i,j) in buf.iter().zip("SQLite format 3".as_bytes().iter()) {
-        if i != j {
+    if let Ok(f_header) = String::from_utf8(buf.to_vec()) {
+        if f_header != SQLITE_FILE_ID {
             return Ok(DbType::Unknown);
         }
     }
 
-    let r = rusqlite::Connection::open(filepath);
-    if r.is_ok() {
-        let conn = r.unwrap();
-
+    if let Ok(conn) = rusqlite::Connection::open(filepath) {
         if is_db_with_table(&conn, "moz_cookies") {
             conn.close().unwrap();
             return Ok(DbType::Firefox);
@@ -123,7 +117,8 @@ pub fn cookie_db_type(filepath:&Path) -> Result<DbType,io::Error> {
 /// skipping lines that start with '#'. Each entry will have explicit
 /// quotes surrounding it.
 pub fn parse_whitelist(filepath: &Path) -> Result<Vec<String>,io::Error> {
-    let f = File::open(filepath)?;
+    let f = OpenOptions::new().read(true).open(filepath)
+        .expect("Failed to open whitelist");
     let mut reader = io::BufReader::new(f);
 
     let mut whitelist = vec![];

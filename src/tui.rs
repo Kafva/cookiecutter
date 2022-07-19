@@ -654,7 +654,7 @@ fn debug_log<T: std::fmt::Display>(msg: T) {
             .create(true)
             .append(true)
             .open(DEBUG_LOG)
-            .unwrap();
+            .expect("Failed to open debug log");
 
         writeln!(f,"-> {msg}").expect("Failed to write debug message");
     }
