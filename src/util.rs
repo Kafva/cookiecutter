@@ -172,8 +172,10 @@ mod tests {
 
     #[test]
     fn test_is_cookie_db() {
-        let result = cookie_db_type(Path::new("./moz_cookies.sqlite"));
-        assert!(matches!(result.unwrap(), DbType::Firefox));
+        if Path::new("moz_cookies.sqlite").exists() {
+            let result = cookie_db_type(Path::new("moz_cookies.sqlite"));
+            assert!(matches!(result.unwrap(), DbType::Firefox));
+        }
     }
 }
 

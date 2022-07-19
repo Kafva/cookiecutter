@@ -1,8 +1,8 @@
 *.sqlite-wal
 *.sqlite-shm
+*.sqlite
 ex.txt
 cmonster.sh
-*.sqlite
 .lego
 *.vrb
 *.snm
