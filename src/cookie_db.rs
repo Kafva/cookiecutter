@@ -200,11 +200,17 @@ impl CookieDB {
         conn.execute(&query, rusqlite::params![])?;
         conn.close().unwrap();
 
-        // Retain all except the removed entries
         if name.is_empty(){
+            // Retain all except cookies from the specified domain
             self.cookies.retain(|c| c.host != domain)
         } else {
-            self.cookies.retain(|c| c.host != domain && c.name != name)
+            // Retain all cookies except those that match `name`
+            // and are present on the specified domain
+            self.cookies.retain(|c| { 
+                if c.host == domain { 
+                    c.name != name 
+                } else { true }
+            })
         }
 
         Ok(())
@@ -233,7 +239,6 @@ impl CookieDB {
      -> Option<&Cookie> {
          self.cookies.iter().find(|c| c.host == *domain && c.name == *name)
     }
-
 }
 
 #[cfg(test)]

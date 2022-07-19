@@ -278,7 +278,14 @@ fn handle_key(code: KeyCode,
             // will become incorrect
             state.search_matches.clear();
             state.selected_match = NO_SELECTION;
-            delete_in_current_split(state,cookie_dbs)
+
+            if let Some(profile_idx) = state.profiles.status.selected() {
+                if let Some(cdb) = cookie_dbs.get_mut(profile_idx) {
+                    if let Some(current_domain) = state.selected_domain() {
+                        delete_in_current_split(state,cdb,current_domain)
+                    }
+                }
+            }
         },
         //== Copy value to clipboard ==//
         KeyCode::Char('C') => {
@@ -309,76 +316,72 @@ fn handle_key(code: KeyCode,
 /// Delete the currently selected cookie if in the `Cookies` split
 /// and all cookies from a domain if inside the `Domains` split
 /// To update the internal cookie_db requires a mutable reference
-fn delete_in_current_split(state: &mut State, cookie_dbs: &mut Vec<CookieDB>) {
-    if let Some(profile_idx) = state.profiles.status.selected() {
-        if let Some(cdb) = cookie_dbs.get_mut(profile_idx) {
-            if let Some(current_domain) = state.selected_domain() {
-                match state.selection {
-                    // Remove all cookies from the current domain
-                    Selection::Domains => {
-                        debug_log(format!("Deleting: {current_domain}"));
-                        cdb.delete_from_domain(
-                            &current_domain, ""
-                        ).expect("Failed to delete cookies from domain");
+fn delete_in_current_split(state: &mut State, cdb: &mut CookieDB, 
+ current_domain: String) {
+    match state.selection {
+        // Remove all cookies from the current domain
+        Selection::Domains => {
+            debug_log(format!("Deleting: {current_domain}"));
+            cdb.delete_from_domain(
+                &current_domain, ""
+            ).expect("Failed to delete cookies from domain");
 
-                        // If the removed item was the last domain,
-                        // unselect the domains split
-                        if state.current_domains.items.len() <= 1 {
-                            state.current_domains.status.select(None)
-                        }
-                        // The selected() index needs to be decremented
-                        // in case we removed that last item
-                        else {
-                            let curr = state.current_domains.status
-                                .selected().unwrap();
-                            if curr != 0 {
-                                state.current_domains.status
-                                    .select(Some(curr-1));
-                            }
-                        }
-                    },
-                    // Remove a specific cookie from the current domain
-                    Selection::Cookies => {
-                        if let Some(current_cookie) = state.selected_cookie() {
-                            debug_log(format!(
-                                "Deleting: {current_domain}.{current_cookie}"
-                            ));
-                            cdb.delete_from_domain(
-                                &current_domain, &current_cookie
-                            ).expect("Failed to delete cookie");
-
-                            // If the removed item was the last cookie,
-                            // unselect the cookie split
-                            if state.current_cookies.items.len() <= 1 {
-                                state.current_cookies.status.select(None);
-                                state.selection = Selection::Domains;
-                                // If the domain split could also become empty
-                                // from the deletion operation, select profiles
-                                if state.current_domains.items.len() <= 1 {
-                                    state.current_domains.status.select(None);
-                                    state.selection = Selection::Profiles;
-                                }
-                            }
-                            // The selected() index needs to be decremented
-                            // in case we removed that last item
-                            else {
-                                let curr = state.current_cookies.status
-                                    .selected().unwrap();
-                                if curr != 0 {
-                                    state.current_cookies.status
-                                        .select(Some(curr-1));
-                                    debug_log(format!(
-                                        "Selecting cookie: {}", curr-1
-                                    ))
-                                }
-                            }
-
-                        }
-                    },
-                    _ => {  }
+            // If the removed item was the last domain,
+            // unselect the domains split
+            // The length will be non-decremented until the next `ui()` tick 
+            if state.current_domains.items.len() == 1 {
+                state.current_domains.status.select(None)
+            }
+            // The selected() index needs to be decremented
+            // in case we removed that last item
+            else {
+                let curr = state.current_domains.status
+                    .selected().unwrap();
+                if curr != 0 {
+                    state.current_domains.status
+                        .select(Some(curr-1));
                 }
             }
-        }
+        },
+        // Remove a specific cookie from the current domain
+        Selection::Cookies => {
+            if let Some(current_cookie) = state.selected_cookie() {
+                debug_log(format!(
+                    "Deleting: {current_domain}.{current_cookie}"
+                ));
+                cdb.delete_from_domain(
+                    &current_domain, &current_cookie
+                ).expect("Failed to delete cookie");
+
+                // If the removed item was the last cookie,
+                // unselect the cookie split
+                if state.current_cookies.items.len() == 1 {
+                    state.current_cookies.status.select(None);
+                    state.selection = Selection::Domains;
+                    // If the domain split could also become empty
+                    // from the deletion operation, select profiles
+                    if state.current_domains.items.len() == 1 {
+                        state.current_domains.status.select(None);
+                        state.selection = Selection::Profiles;
+                    }
+                }
+                // The selected() index needs to be decremented
+                // in case we removed that last item
+                else {
+                    let curr = state.current_cookies.status
+                        .selected().unwrap();
+                    if curr != 0 {
+                        state.current_cookies.status
+                            .select(Some(curr-1));
+                        debug_log(format!(
+                            "Selecting cookie: {}", curr-1
+                        ))
+                    }
+                }
+
+            }
+        },
+        _ => {  }
     }
 }
 

@@ -145,8 +145,11 @@ fn main() -> Result<(),()> {
     } 
     //== Subcmd: tui ==//
     else if Config::global().tui {
-        // Delete any previous debug log
-        std::fs::remove_file(DEBUG_LOG).unwrap_or_default();
+        // Clear the debug log
+        if Config::global().debug {
+            std::fs::OpenOptions::new().write(true).create(true).open(DEBUG_LOG)
+                .expect("Failed to create debug log");
+        }
 
         cookie_dbs.iter_mut().for_each(|c| 
            c.load_cookies().expect("Failed to load cookies")
