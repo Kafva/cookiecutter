@@ -35,6 +35,8 @@ use crate::{
     util::copy_to_clipboard
 };
 
+//============================================================================//
+
 /// Entrypoint for the TUI
 pub fn run(cookie_dbs: Vec<CookieDB>) -> Result<(),io::Error> {
     // Disable certain parts of the terminal's default behaviour
@@ -97,6 +99,160 @@ fn run_ui<B: Backend>(term: &mut Terminal<B>, state: &mut State,
         }
         if last_tick.elapsed() >= tick_rate {
             last_tick = Instant::now();
+        }
+    }
+}
+
+/// Render the UI, called on each tick.
+/// Lists will be displayed at different indices depending on
+/// which of the two views are active:
+///  View 1: (selected 0-1)
+///  View 2: (selected: 2)
+///
+///  |0       |1      |2           |3         |
+///  |profiles|domains|cookie names|field_list|
+///
+fn ui<B: Backend>(frame: &mut Frame<B>, state: 
+ &mut State, cookie_dbs: &Vec<CookieDB>) {
+    // == Layout ==//
+    // Split the frame vertically into a body and footer
+    let vert_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(98),
+            Constraint::Percentage(2)]
+        .as_ref())
+        .split(frame.size());
+
+    // Create three chunks for the body
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(1)
+        .constraints([
+             Constraint::Percentage(33),
+             Constraint::Percentage(33),
+             Constraint::Percentage(33)
+        ].as_ref())
+        .split(vert_chunks[0]);
+
+    if state.search_open {
+        //== Render the search input ==//
+        render_search(frame, state, vert_chunks[1])
+    } else {
+        //== Render the footer ==//
+        frame.render_widget(create_footer(), vert_chunks[1])
+    }
+
+    // Determine which splits should be rendered
+    let (profiles_idx, domains_idx, cookies_idx, fields_idx) =
+        if matches!(state.selection, Selection::Cookies) {
+            (NO_SELECTION,0,1,2)
+        } else {
+            (0,1,2,NO_SELECTION)
+        };
+
+    if profiles_idx != NO_SELECTION {
+        //== Profiles ==//
+        let profile_items: Vec<ListItem> =
+            create_list_items(&state.profiles.items);
+
+        let profile_list =  add_highlight(
+            create_list(profile_items,
+                "Profiles".to_string(), Borders::NONE
+            )
+        );
+
+        //== Render profiles ==//
+        frame.render_stateful_widget(
+            profile_list, chunks[profiles_idx], &mut state.profiles.status
+        );
+    }
+
+    //== Domains ==//
+    if let Some(profile_idx) = state.profiles.status.selected() {
+        if let Some(cdb) = cookie_dbs.get(profile_idx) {
+            // Fill the current_domains state list
+            state.current_domains.items = cdb.domains();
+
+            let domain_items = create_list_items(&state.current_domains.items);
+
+            let domain_list = add_highlight(
+                create_list(domain_items, "Domains".to_string(), Borders::NONE)
+            );
+
+            //== Render domains ==//
+            frame.render_stateful_widget(
+                domain_list, chunks[domains_idx],
+                &mut state.current_domains.status
+            );
+
+            //== Cookies ==//
+            if let Some(current_domain) = state.selected_domain() {
+                // Fill the current_cookies state list
+                state.current_cookies.items =
+                    cdb.cookies_for_domain(&current_domain).iter()
+                        .map(|c| c.name.to_owned() ).collect();
+
+                let cookies_items = create_list_items(
+                    &state.current_cookies.items
+                );
+
+                let cookies_list = add_highlight(
+                    create_list(cookies_items,
+                        "Cookies".to_string(),
+                        Borders::NONE
+                ));
+
+                //== Render cookies ==//
+                frame.render_stateful_widget(
+                    cookies_list, chunks[cookies_idx],
+                    &mut state.current_cookies.status
+                );
+
+                //== Fields ==//
+                //debug_log(format!("Crash {:?} {:?} ",
+                //        state.current_cookies.items,  
+                //        state.current_cookies.status.selected()
+                //));
+                if let Some(current_cookie) = state.selected_cookie() {
+                    if let Some(cookie) = cdb
+                        .cookie_for_domain(
+                            &current_cookie,&current_domain
+                        ) {
+
+                        // Fill the current_fields state list
+                        state.current_fields.items = vec![
+                            cookie.match_field("Value",true,false),
+                            cookie.match_field("Path",true,false),
+                            cookie.match_field("Creation",true,false),
+                            cookie.match_field("Expiry",true,false),
+                            cookie.match_field("LastAccess",true,false),
+                            cookie.match_field("HttpOnly",true,false),
+                            cookie.match_field("Secure",true,false),
+                            cookie.match_field("SameSite",true,false),
+                        ];
+
+                        // Create list items for the UI
+                        let fields_items: Vec<ListItem> =
+                            create_list_items(&state.current_fields.items);
+
+                        let fields_list = create_list(
+                            fields_items, "Fields".to_string(), Borders::ALL
+                        );
+
+                        if fields_idx != NO_SELECTION {
+                            //== Render fields ==//
+                            frame.render_stateful_widget(
+                                fields_list, chunks[fields_idx],
+                                &mut state.current_fields.status
+                            );
+                            if state.current_fields.items.len() > 0 {
+                                state.current_fields.status.select(Some(0));
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -410,159 +566,7 @@ fn set_matches(items: &Vec<String>, q: String, search_matches: &mut Vec<usize>)
     search_matches.len() != 0
 }
 
-/// Render the UI, called on each tick.
-/// Lists will be displayed at different indices depending on
-/// which of the two views are active:
-///  View 1: (selected 0-1)
-///  View 2: (selected: 2)
-///
-///  |0       |1      |2           |3         |
-///  |profiles|domains|cookie names|field_list|
-///
-fn ui<B: Backend>(frame: &mut Frame<B>, state: 
- &mut State, cookie_dbs: &Vec<CookieDB>) {
-    // == Layout ==//
-    // Split the frame vertically into a body and footer
-    let vert_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage(98),
-            Constraint::Percentage(2)]
-        .as_ref())
-        .split(frame.size());
-
-    // Create three chunks for the body
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .margin(1)
-        .constraints([
-             Constraint::Percentage(33),
-             Constraint::Percentage(33),
-             Constraint::Percentage(33)
-        ].as_ref())
-        .split(vert_chunks[0]);
-
-    if state.search_open {
-        //== Render the search input ==//
-        render_search(frame, state, vert_chunks[1])
-    } else {
-        //== Render the footer ==//
-        frame.render_widget(create_footer(), vert_chunks[1])
-    }
-
-    // Determine which splits should be rendered
-    let (profiles_idx, domains_idx, cookies_idx, fields_idx) =
-        if matches!(state.selection, Selection::Cookies) {
-            (NO_SELECTION,0,1,2)
-        } else {
-            (0,1,2,NO_SELECTION)
-        };
-
-    if profiles_idx != NO_SELECTION {
-        //== Profiles ==//
-        let profile_items: Vec<ListItem> =
-            create_list_items(&state.profiles.items);
-
-        let profile_list =  add_highlight(
-            create_list(profile_items,
-                "Profiles".to_string(), Borders::NONE
-            )
-        );
-
-        //== Render profiles ==//
-        frame.render_stateful_widget(
-            profile_list, chunks[profiles_idx], &mut state.profiles.status
-        );
-    }
-
-    //== Domains ==//
-    if let Some(profile_idx) = state.profiles.status.selected() {
-        if let Some(cdb) = cookie_dbs.get(profile_idx) {
-            // Fill the current_domains state list
-            state.current_domains.items = cdb.domains();
-
-            let domain_items = create_list_items(&state.current_domains.items);
-
-            let domain_list = add_highlight(
-                create_list(domain_items, "Domains".to_string(), Borders::NONE)
-            );
-
-            //== Render domains ==//
-            frame.render_stateful_widget(
-                domain_list, chunks[domains_idx],
-                &mut state.current_domains.status
-            );
-
-            //== Cookies ==//
-            if let Some(current_domain) = state.selected_domain() {
-                // Fill the current_cookies state list
-                state.current_cookies.items =
-                    cdb.cookies_for_domain(&current_domain).iter()
-                        .map(|c| c.name.to_owned() ).collect();
-
-                let cookies_items = create_list_items(
-                    &state.current_cookies.items
-                );
-
-                let cookies_list = add_highlight(
-                    create_list(cookies_items,
-                        "Cookies".to_string(),
-                        Borders::NONE
-                ));
-
-                //== Render cookies ==//
-                frame.render_stateful_widget(
-                    cookies_list, chunks[cookies_idx],
-                    &mut state.current_cookies.status
-                );
-
-                //== Fields ==//
-                //debug_log(format!("Crash {:?} {:?} ",
-                //        state.current_cookies.items,  
-                //        state.current_cookies.status.selected()
-                //));
-                if let Some(current_cookie) = state.selected_cookie() {
-                    if let Some(cookie) = cdb
-                        .cookie_for_domain(
-                            &current_cookie,&current_domain
-                        ) {
-
-                        // Fill the current_fields state list
-                        state.current_fields.items = vec![
-                            cookie.match_field("Value",true,false),
-                            cookie.match_field("Path",true,false),
-                            cookie.match_field("Creation",true,false),
-                            cookie.match_field("Expiry",true,false),
-                            cookie.match_field("LastAccess",true,false),
-                            cookie.match_field("HttpOnly",true,false),
-                            cookie.match_field("Secure",true,false),
-                            cookie.match_field("SameSite",true,false),
-                        ];
-
-                        // Create list items for the UI
-                        let fields_items: Vec<ListItem> =
-                            create_list_items(&state.current_fields.items);
-
-                        let fields_list = create_list(
-                            fields_items, "Fields".to_string(), Borders::ALL
-                        );
-
-                        if fields_idx != NO_SELECTION {
-                            //== Render fields ==//
-                            frame.render_stateful_widget(
-                                fields_list, chunks[fields_idx],
-                                &mut state.current_fields.status
-                            );
-                            if state.current_fields.items.len() > 0 {
-                                state.current_fields.status.select(Some(0));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+//============================================================================//
 
 /// Create list items for the UI
 /// Nodes with text exceeding `TUI_TEXT_TRUNCATE_LIM`
@@ -644,7 +648,6 @@ fn create_list(items: Vec<ListItem>, title: String, border: Borders) -> List {
 }
 
 /// Print a debug message to `DEBUG_LOG`
-#[allow(dead_code)]
 fn debug_log<T: std::fmt::Display>(msg: T) {
     if Config::global().debug {
         let mut f = OpenOptions::new()
