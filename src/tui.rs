@@ -332,14 +332,11 @@ fn delete_in_current_split(state: &mut State, cdb: &mut CookieDB,
             if state.current_domains.items.len() == 1 {
                 state.current_domains.status.select(None)
             }
-            // The selected() index needs to be decremented
-            // in case we removed that last item
-            else {
-                let curr = state.current_domains.status
-                    .selected().unwrap();
-                if curr != 0 {
-                    state.current_domains.status
-                        .select(Some(curr-1));
+            else if let Some(sel) = state.current_domains.status.selected(){
+                // The selected() index needs to be decremented
+                // in case we removed that last item
+                if sel == state.current_domains.items.len()-1 {
+                    state.current_domains.status.select(Some(sel-1));
                 }
             }
         },
@@ -365,17 +362,9 @@ fn delete_in_current_split(state: &mut State, cdb: &mut CookieDB,
                         state.selection = Selection::Profiles;
                     }
                 }
-                // The selected() index needs to be decremented
-                // in case we removed that last item
-                else {
-                    let curr = state.current_cookies.status
-                        .selected().unwrap();
-                    if curr != 0 {
-                        state.current_cookies.status
-                            .select(Some(curr-1));
-                        debug_log(format!(
-                            "Selecting cookie: {}", curr-1
-                        ))
+                else if let Some(sel) = state.current_cookies.status.selected(){
+                    if sel == state.current_cookies.items.len()-1 {
+                        state.current_cookies.status.select(Some(sel-1));
                     }
                 }
 
