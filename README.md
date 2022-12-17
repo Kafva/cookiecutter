@@ -1,7 +1,7 @@
 # rokie
 A CLI cookie manager for Firefox and Chromium.
 
-![](.github/screenshot.png)
+![](https://i.imgur.com/aQZ7oMJ.png)
 
 The tool was mainly built to gain experience with Rust. Equivalent cleaning
 functionality could be attained from a short shell script if one is looking
@@ -12,7 +12,7 @@ Chromium cookies.
 
 ## Examples
 Interactive view over cookies from a specific file (screenshot)
-```
+```bash
 rokie --file cookies.sqlite tui
 ```
 List all cookies from a given domain in a specific browser profile
