@@ -1,43 +1,37 @@
+use clap::{Parser, Subcommand};
 use once_cell::sync::OnceCell;
-use clap::{Parser,Subcommand};
 use phf::phf_map;
 
 //== Global constants ==//
 pub const ENCRYPTED_VALUE: &'static str = "********";
-pub const ALL_FIELDS: &'static str      = "All";
-pub const NO_SELECTION: usize           = 9999999;
-pub const DEBUG_LOG: &'static str       = "rokie.log";
-pub const TUI_PRIMARY_COLOR: u8         = 111;
-pub const TUI_TEXT_TRUNCATE_LIM: usize  = 48;
-pub const TUI_SEARCH: &'static str      = "Search:";
-pub const SQLITE_FILE_ID: &'static str  = "SQLite format 3";
+pub const ALL_FIELDS: &'static str = "All";
+pub const NO_SELECTION: usize = 9999999;
+pub const DEBUG_LOG: &'static str = "rokie.log";
+pub const TUI_PRIMARY_COLOR: u8 = 111;
+pub const TUI_TEXT_TRUNCATE_LIM: usize = 48;
+pub const TUI_SEARCH: &'static str = "Search:";
+pub const SQLITE_FILE_ID: &'static str = "SQLite format 3";
 
-pub const DB_NAMES: &'static [&'static str] = &[
-    "Cookies",
-    "Safe Browsing Cookies",
-    "cookies.sqlite"
-];
+pub const DB_NAMES: &'static [&'static str] =
+    &["Cookies", "Safe Browsing Cookies", "cookies.sqlite"];
 
 pub const SEARCH_DIRS: &'static [&'static str] = &[
     ".mozilla/firefox",
     ".config/chromium",
     ".config/BraveSoftware/Brave-Browser",
-
     "Library/Application Support/Firefox/Profiles",
     "Library/Application Support/Chromium",
     "Library/Application Support/BraveSoftware/Brave-Browser",
-
     "AppData/Roaming/Mozilla/Firefox/Profiles",
-
     "Library/Application Support/Firefox",
     "Library/Application Support/Chromium",
-    "Library/Application Support/BraveSoftware/Brave-Browser"
+    "Library/Application Support/BraveSoftware/Brave-Browser",
 ];
 
 /// A constant hash map with keys representing each valid Cookie field.
 /// Each key maps to a tuple that contains the name of the Chrome and
 /// Firefox version of the corresponding field.
-pub const COOKIE_FIELDS: phf::Map<&'static str, [&'static str; 2]> = phf_map!{
+pub const COOKIE_FIELDS: phf::Map<&'static str, [&'static str; 2]> = phf_map! {
     "Host"       => ["host_key",         "host"],
     "Name"       => ["name",             "name"],
     "Value"      => ["value",            "value"],
@@ -50,9 +44,8 @@ pub const COOKIE_FIELDS: phf::Map<&'static str, [&'static str; 2]> = phf_map!{
     "SameSite"   => ["samesite",         "sameSite"],
 };
 
-
 //=== CLI arguments ===//
-#[derive(Debug,Subcommand)]
+#[derive(Debug, Subcommand)]
 enum SubArgs {
     /// List cookies
     Cookies {
@@ -74,7 +67,6 @@ enum SubArgs {
         /// Only include entries matching a specific domain name
         #[clap(short, long, default_value_t)]
         domain: String,
-
     },
     /// Remove cookies non-interactively
     Clean {
@@ -84,17 +76,18 @@ enum SubArgs {
 
         /// Apply changes
         #[clap(short, long)]
-        apply: bool
+        apply: bool,
     },
     /// Interactive view of cookies across all browsers
-    Tui {
-    }
+    Tui {},
 }
 
-
 #[derive(Parser, Debug)]
-#[clap(version = "1.0", author = "Kafva <https://github.com/Kafva>",
-  about = "CLI cookie manager for Firefox and Chromium")]
+#[clap(
+    version = "1.0",
+    author = "Kafva <https://github.com/Kafva>",
+    about = "CLI cookie manager for Firefox and Chromium"
+)]
 /// https://github.com/clap-rs/clap/blob/v3.2.7/examples/derive_ref/README.md#arg-attributes
 /// The `value_parser` trait is required to access an option from the `args`
 /// object, this is not usable for subcommands.
@@ -124,9 +117,8 @@ pub struct Args {
     pub file: String,
 
     #[clap(subcommand)]
-    subargs: Option<SubArgs>
+    subargs: Option<SubArgs>,
 }
-
 
 //=== Config ===//
 #[derive(Debug)]
@@ -164,7 +156,7 @@ impl Default for Config {
             nocolor: false,
             tui: false,
             clean: false,
-            apply: false
+            apply: false,
         }
     }
 }
@@ -172,31 +164,40 @@ impl Default for Config {
 impl Config {
     /// Initialise a new config object from an Args struct
     pub fn from_args(args: &Args) -> Self {
-        let mut cfg       = Config::default();
-        cfg.nocolor       = args.nocolor;
-        cfg.debug         = args.debug;
+        let mut cfg = Config::default();
+        cfg.nocolor = args.nocolor;
+        cfg.debug = args.debug;
 
         match &args.subargs {
             Some(SubArgs::Cookies {
-                no_heading, list_fields, fields, domain
+                no_heading,
+                list_fields,
+                fields,
+                domain,
             }) => {
                 cfg.no_heading = *no_heading;
                 cfg.list_fields = *list_fields;
                 cfg.domain = domain.clone();
-                cfg.fields = fields.clone(); cfg
+                cfg.fields = fields.clone();
+                cfg
             }
             Some(SubArgs::Clean { whitelist, apply }) => {
                 cfg.clean = true;
                 cfg.apply = *apply;
-                cfg.whitelist = whitelist.clone(); cfg
+                cfg.whitelist = whitelist.clone();
+                cfg
             }
-            Some(SubArgs::Tui {}) => { cfg.tui = true; cfg }
-            None => { cfg }
+            Some(SubArgs::Tui {}) => {
+                cfg.tui = true;
+                cfg
+            }
+            None => cfg,
         }
     }
     /// Used to access the global config object in the program
     pub fn global() -> &'static Self {
-        CONFIG.get()
+        CONFIG
+            .get()
             .expect("No globally initialised Config object exists")
     }
 }

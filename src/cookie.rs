@@ -1,12 +1,11 @@
 use std::fmt;
 
-use chrono::{TimeZone,Utc};
+use chrono::{TimeZone, Utc};
 
-use crate::{COOKIE_FIELDS,ALL_FIELDS};
 use crate::config::ENCRYPTED_VALUE;
+use crate::{ALL_FIELDS, COOKIE_FIELDS};
 
-
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct Cookie {
     /// The domain that created the cookie
     pub host: String,
@@ -44,91 +43,104 @@ pub struct Cookie {
     pub samesite: i32,
 
     /// The encrypted value of a cooke, unique to Chrome
-    pub encrypted_value: Vec<u8>
+    pub encrypted_value: Vec<u8>,
 }
 
 impl Cookie {
     /// Construct a newline separated string with the specified field names
     /// The `fields` parameter is a comma separated string or `All`
-    pub fn fields_as_str(&self, fields: &String, use_name: bool, color: bool) 
-     -> String {
-        let mut values: Vec<String> = COOKIE_FIELDS.keys().map(|f| {
-            // Skip fields not listed in the --fields option
-            if !fields.split(",").any(|s| {s==*f || fields == ALL_FIELDS} ) {
-               String::from("")
-            } else {
-                self.match_field(*f,use_name,color)
-            }}).filter(|f| f != "" ).collect();
+    pub fn fields_as_str(
+        &self,
+        fields: &String,
+        use_name: bool,
+        color: bool,
+    ) -> String {
+        let mut values: Vec<String> = COOKIE_FIELDS
+            .keys()
+            .map(|f| {
+                // Skip fields not listed in the --fields option
+                if !fields.split(",").any(|s| s == *f || fields == ALL_FIELDS) {
+                    String::from("")
+                } else {
+                    self.match_field(*f, use_name, color)
+                }
+            })
+            .filter(|f| f != "")
+            .collect();
         values.sort();
         values.join("\n")
     }
 
     /// Create formatteed output for a given field
-    pub fn match_field(&self, field_name: &str, use_name: bool, color: bool) 
-     -> String {
+    pub fn match_field(
+        &self,
+        field_name: &str,
+        use_name: bool,
+        color: bool,
+    ) -> String {
         match field_name {
-        "Host" =>       {
-            self.field_fmt(
-                color, use_name, "Host", self.host.to_owned() 
-            )
-        },
-        "Name" =>       {
-            self.field_fmt(
-                color, use_name, "Name", self.name.to_owned() 
-            )
-        },
-        "Value" =>      {
-            let has_enc = self.value.is_empty() && 
-                     !self.encrypted_value.is_empty();
-            let val = if has_enc {
-                String::from(ENCRYPTED_VALUE)
-             } else {
-                self.value.to_owned()
-             };
-            self.field_fmt(color, use_name, "Value", val)
-        },
-        "Path" =>       {
-            self.field_fmt(
-                color, use_name, "Path", self.path.to_owned() 
-            )
-        },
-        "Creation" =>   {
-            self.field_fmt(color, use_name, "Creation", 
-                Utc.timestamp(self.creation, 0)
-            )
-        },
-        "Expiry" =>     {
-            self.field_fmt(
-                color, use_name, "Expiry", Utc.timestamp(self.expiry,0)
-            )
-        },
-        "LastAccess" => {
-            self.field_fmt(color, use_name, "LastAccess", 
-                Utc.timestamp(self.last_access,0)
-            )
-        },
-        "HttpOnly" =>   {
-            self.field_fmt(color, use_name, "HttpOnly", self.http_only)
-        },
-        "Secure" =>   {
-            self.field_fmt(color, use_name, "Secure", self.secure)
-        },
-        "SameSite" =>   {
-            let samesite = match self.samesite {
-                2    => "Strict",
-                1    => "Lax",
-                -1|0 => "None",
-                _ => panic!("Unknown SameSite type")
-            };
-            self.field_fmt(color, use_name, "SameSite", samesite)
-        },
-        _ => panic!("Unknown cookie field")
+            "Host" => {
+                self.field_fmt(color, use_name, "Host", self.host.to_owned())
+            }
+            "Name" => {
+                self.field_fmt(color, use_name, "Name", self.name.to_owned())
+            }
+            "Value" => {
+                let has_enc =
+                    self.value.is_empty() && !self.encrypted_value.is_empty();
+                let val = if has_enc {
+                    String::from(ENCRYPTED_VALUE)
+                } else {
+                    self.value.to_owned()
+                };
+                self.field_fmt(color, use_name, "Value", val)
+            }
+            "Path" => {
+                self.field_fmt(color, use_name, "Path", self.path.to_owned())
+            }
+            "Creation" => self.field_fmt(
+                color,
+                use_name,
+                "Creation",
+                Utc.timestamp(self.creation, 0),
+            ),
+            "Expiry" => self.field_fmt(
+                color,
+                use_name,
+                "Expiry",
+                Utc.timestamp(self.expiry, 0),
+            ),
+            "LastAccess" => self.field_fmt(
+                color,
+                use_name,
+                "LastAccess",
+                Utc.timestamp(self.last_access, 0),
+            ),
+            "HttpOnly" => {
+                self.field_fmt(color, use_name, "HttpOnly", self.http_only)
+            }
+            "Secure" => self.field_fmt(color, use_name, "Secure", self.secure),
+            "SameSite" => {
+                let samesite = match self.samesite {
+                    2 => "Strict",
+                    1 => "Lax",
+                    -1 | 0 => "None",
+                    _ => panic!("Unknown SameSite type"),
+                };
+                self.field_fmt(color, use_name, "SameSite", samesite)
+            }
+            _ => panic!("Unknown cookie field"),
         }
     }
 
     /// The output format of cookie fields listed with the `cookies` option
-    fn field_fmt<T: fmt::Display>(&self, color: bool, use_name: bool, 
-     name: &'static str, value: T) -> String {
+    fn field_fmt<T: fmt::Display>(
+        &self,
+        color: bool,
+        use_name: bool,
+        name: &'static str,
+        value: T,
+    ) -> String {
         let mut output = String::new();
         if use_name {
             output = if !color {

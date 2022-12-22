@@ -1,7 +1,6 @@
 [package]
 name = "rokie"
 description = "A CLI cookie manager for Firefox and Chromium."
-license = "The Unlicense"
 version = "0.1.0"
 edition = "2021"
 

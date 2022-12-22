@@ -1,12 +1,12 @@
 #[macro_export]
 macro_rules! msg_prefix {
-    ( $x:literal ) => (
+    ( $x:literal ) => {
         if Config::global().nocolor {
             eprint!("!> ");
         } else {
-            eprint!("{}",format!("\x1b[{}m!>\x1b[0m ", $x));
+            eprint!("{}", format!("\x1b[{}m!>\x1b[0m ", $x));
         }
-    )
+    };
 }
 #[macro_export]
 macro_rules! errln {
@@ -48,5 +48,3 @@ macro_rules! debugln {
         }
     )
 }
-
-
