@@ -1,6 +1,6 @@
 use std::fmt;
 
-use chrono::{TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 
 use crate::config::ENCRYPTED_VALUE;
 use crate::{ALL_FIELDS, COOKIE_FIELDS};
@@ -102,19 +102,19 @@ impl Cookie {
                 color,
                 use_name,
                 "Creation",
-                Utc.timestamp(self.creation, 0),
+                Self::date_fmt(self.creation),
             ),
             "Expiry" => self.field_fmt(
                 color,
                 use_name,
                 "Expiry",
-                Utc.timestamp(self.expiry, 0),
+                Self::date_fmt(self.expiry),
             ),
             "LastAccess" => self.field_fmt(
                 color,
                 use_name,
                 "LastAccess",
-                Utc.timestamp(self.last_access, 0),
+                Self::date_fmt(self.last_access)
             ),
             "HttpOnly" => {
                 self.field_fmt(color, use_name, "HttpOnly", self.http_only)
@@ -130,6 +130,14 @@ impl Cookie {
                 self.field_fmt(color, use_name, "SameSite", samesite)
             }
             _ => panic!("Unknown cookie field"),
+        }
+    }
+
+    fn date_fmt(epoch: i64) -> DateTime<Utc> {
+        match Utc.timestamp_opt(epoch, 0) {
+            chrono::offset::LocalResult::Single(s) => s,
+            chrono::offset::LocalResult::Ambiguous(e, _) => e,
+            _ => DateTime::from_timestamp(0, 0).unwrap()
         }
     }
 

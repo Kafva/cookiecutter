@@ -3,10 +3,6 @@ A CLI cookie manager for Firefox and Chromium.
 
 ![](https://i.imgur.com/aQZ7oMJ.png)
 
-The tool was mainly built to gain experience with Rust. Equivalent cleaning
-functionality could be attained from a short shell script if one is looking
-for a minimal solution.
-
 Currently does not support decryption of the `encrypted_value` field of
 Chromium cookies.
 
