@@ -1,5 +1,5 @@
 [package]
-name = "rokie"
+name = "cookiecutter"
 description = "A CLI cookie manager for Firefox and Chromium."
 version = "0.1.0"
 edition = "2021"
