@@ -10,7 +10,7 @@ use std::{
 
 use walkdir::WalkDir;
 
-use sysinfo::{RefreshKind, System, SystemExt};
+use sysinfo::{ProcessRefreshKind, RefreshKind, System};
 
 use crate::config::{DB_NAMES, SEARCH_DIRS, SQLITE_FILE_ID};
 use crate::cookie_db::CookieDB;
@@ -36,16 +36,16 @@ pub fn get_home() -> String {
 /// Check if a process is running using the `sysinfo` library
 pub fn process_is_running(name: &str) -> bool {
     let sys = System::new_with_specifics(
-        RefreshKind::everything()
-            .without_cpu()
-            .without_disks()
-            .without_networks()
-            .without_memory()
-            .without_components()
-            .without_users_list(),
+        RefreshKind::nothing().with_processes(
+            ProcessRefreshKind::everything()
+                .without_cpu()
+                .without_disk_usage()
+                .without_memory()
+                .without_user()
+        )
     );
     let found = sys
-        .processes_by_exact_name(name)
+        .processes_by_exact_name(name.as_ref())
         .find_map(|_| Some(true))
         .is_some();
     found

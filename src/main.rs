@@ -142,7 +142,7 @@ fn main() -> Result<(), ()> {
                 .expect("Failed to delete cookies from database");
         }
         if Config::global().apply {
-            infoln!("== Deletions committed ==");
+            infoln!("Deletions committed");
         } else {
             infoln!("To perform deletions, pass `--apply`");
         }

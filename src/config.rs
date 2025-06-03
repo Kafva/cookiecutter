@@ -50,11 +50,11 @@ enum SubArgs {
     /// List cookies
     Cookies {
         /// Skip profile headings
-        #[clap(short, long, takes_value = false)]
+        #[clap(short, long, num_args = 0)]
         no_heading: bool,
 
         /// List valid fields for the --fields option
-        #[clap(long, takes_value = false)]
+        #[clap(long, num_args = 0)]
         list_fields: bool,
 
         /// Comma separated list of fields to list.
@@ -108,7 +108,7 @@ pub struct Args {
     pub profile: String,
 
     /// List valid browser profiles for the --profile option
-    #[clap(long, takes_value = false, value_parser)]
+    #[clap(long, num_args = 0, value_parser)]
     pub list_profiles: bool,
 
     /// Perform all commands on a supplied cookie database

@@ -2,9 +2,9 @@
 macro_rules! msg_prefix {
     ( $x:literal ) => {
         if Config::global().nocolor {
-            eprint!("!> ");
+            eprint!(" * ");
         } else {
-            eprint!("{}", format!("\x1b[{}m!>\x1b[0m ", $x));
+            eprint!("{}", format!("\x1b[{}m *\x1b[0m ", $x));
         }
     };
 }

@@ -162,7 +162,7 @@ impl CookieDB {
             conn.execute(&query, rusqlite::params![])?;
             conn.close().unwrap();
         } else {
-            println!("!> {query}");
+            println!(" * {query}");
         }
         Ok(())
     }
