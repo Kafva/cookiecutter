@@ -586,7 +586,7 @@ fn set_matches(
 /// Create list items for the UI
 /// Nodes with text exceeding `TUI_TEXT_TRUNCATE_LIM`
 /// will be truncated with `...`
-fn create_list_items<T: ToString>(items: &Vec<T>) -> Vec<ListItem> {
+fn create_list_items<T: ToString>(items: &Vec<T>) -> Vec<ListItem<'_>> {
     items
         .iter()
         .map(|p| {
