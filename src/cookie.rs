@@ -53,7 +53,6 @@ impl Cookie {
         &self,
         fields: &String,
         use_name: bool,
-        color: bool,
     ) -> String {
         let mut values: Vec<String> = COOKIE_FIELDS
             .keys()
@@ -62,7 +61,7 @@ impl Cookie {
                 if !fields.split(",").any(|s| s == *f || fields == ALL_FIELDS) {
                     String::from("")
                 } else {
-                    self.match_field(*f, use_name, color)
+                    self.match_field(*f, use_name)
                 }
             })
             .filter(|f| f != "")
@@ -76,14 +75,13 @@ impl Cookie {
         &self,
         field_name: &str,
         use_name: bool,
-        color: bool,
     ) -> String {
         match field_name {
             "Host" => {
-                self.field_fmt(color, use_name, "Host", self.host.to_owned())
+                self.field_fmt(use_name, "Host", self.host.to_owned())
             }
             "Name" => {
-                self.field_fmt(color, use_name, "Name", self.name.to_owned())
+                self.field_fmt(use_name, "Name", self.name.to_owned())
             }
             "Value" => {
                 let has_enc =
@@ -93,33 +91,30 @@ impl Cookie {
                 } else {
                     self.value.to_owned()
                 };
-                self.field_fmt(color, use_name, "Value", val)
+                self.field_fmt(use_name, "Value", val)
             }
             "Path" => {
-                self.field_fmt(color, use_name, "Path", self.path.to_owned())
+                self.field_fmt(use_name, "Path", self.path.to_owned())
             }
             "Creation" => self.field_fmt(
-                color,
                 use_name,
                 "Creation",
                 Self::date_fmt(self.creation),
             ),
             "Expiry" => self.field_fmt(
-                color,
                 use_name,
                 "Expiry",
                 Self::date_fmt(self.expiry),
             ),
             "LastAccess" => self.field_fmt(
-                color,
                 use_name,
                 "LastAccess",
                 Self::date_fmt(self.last_access)
             ),
             "HttpOnly" => {
-                self.field_fmt(color, use_name, "HttpOnly", self.http_only)
+                self.field_fmt(use_name, "HttpOnly", self.http_only)
             }
-            "Secure" => self.field_fmt(color, use_name, "Secure", self.secure),
+            "Secure" => self.field_fmt(use_name, "Secure", self.secure),
             "SameSite" => {
                 let samesite = match self.samesite {
                     2 => "Strict",
@@ -127,7 +122,7 @@ impl Cookie {
                     -1 | 0 => "None",
                     _ => panic!("Unknown SameSite type"),
                 };
-                self.field_fmt(color, use_name, "SameSite", samesite)
+                self.field_fmt(use_name, "SameSite", samesite)
             }
             _ => panic!("Unknown cookie field"),
         }
@@ -144,18 +139,13 @@ impl Cookie {
     /// The output format of cookie fields listed with the `cookies` option
     fn field_fmt<T: fmt::Display>(
         &self,
-        color: bool,
         use_name: bool,
         name: &'static str,
         value: T,
     ) -> String {
         let mut output = String::new();
         if use_name {
-            output = if !color {
-                format!("{}: ", name)
-            } else {
-                format!("\x1b[97;1m{}:\x1b[0m ", name)
-            };
+            output = format!("{}: ", name);
         }
         output + &value.to_string()
     }

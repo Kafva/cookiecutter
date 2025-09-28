@@ -96,10 +96,6 @@ pub struct Args {
     #[clap(short, long)]
     debug: bool,
 
-    /// Disable colored output (not applicable for TUI mode)
-    #[clap(long)]
-    nocolor: bool,
-
     /// Only include entries from a specific browser profile.
     /// Any unique part of the path to profile can be used as an identifier
     /// e.g. `-p Brave` can be resolved to
@@ -124,9 +120,7 @@ pub struct Args {
 #[derive(Debug)]
 pub struct Config {
     pub err_exit: i32,
-
     pub debug: bool,
-    pub nocolor: bool,
 
     // Subcmd: cookies
     pub fields: String,
@@ -153,7 +147,6 @@ impl Default for Config {
             fields: String::from(""),
             list_fields: false,
             domain: String::from(""),
-            nocolor: false,
             tui: false,
             clean: false,
             apply: false,
@@ -165,7 +158,6 @@ impl Config {
     /// Initialise a new config object from an Args struct
     pub fn from_args(args: &Args) -> Self {
         let mut cfg = Config::default();
-        cfg.nocolor = args.nocolor;
         cfg.debug = args.debug;
 
         match &args.subargs {

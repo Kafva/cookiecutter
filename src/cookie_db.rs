@@ -1,10 +1,9 @@
 use std::cmp;
 use std::hash::{Hash, Hasher};
 
-use crate::config::{Config, COOKIE_FIELDS};
+use crate::config::COOKIE_FIELDS;
 use crate::cookie::Cookie;
 use crate::util::{get_home, DbType};
-use crate::{debugln, msg_prefix};
 
 #[derive(Debug)]
 pub struct CookieDB {
@@ -83,7 +82,7 @@ impl CookieDB {
 
     /// Load all cookies from the current `path` into the `cookies` vector
     pub fn load_cookies(&mut self) -> Result<(), rusqlite::Error> {
-        let conn = rusqlite::Connection::open(&self.path)?;
+        let conn = rusqlite::Connection::open_with_flags(&self.path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         let field_idx = if self.typing == DbType::Chrome { 0 } else { 1 };
         let encrypted_field = if self.typing == DbType::Chrome {
             "encrypted_value"
@@ -158,7 +157,6 @@ impl CookieDB {
 
         if apply {
             let conn = rusqlite::Connection::open(&self.path)?;
-            debugln!("{}", query);
             conn.execute(&query, rusqlite::params![])?;
             conn.close().unwrap();
         } else {

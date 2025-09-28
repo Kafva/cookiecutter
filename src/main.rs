@@ -7,7 +7,6 @@ use clap::{CommandFactory, Parser};
 mod config;
 mod cookie;
 mod cookie_db;
-mod macros;
 mod state;
 mod tui;
 mod util;
@@ -30,10 +29,8 @@ fn main() -> Result<(), ()> {
         eprintln!("{:#?}", Config::global());
     }
 
-    // Verify that Firefox is not running since it locks the database
     if process_is_running("firefox") {
-        errln!("Firefox needs to be closed");
-        std::process::exit(Config::global().err_exit);
+        eprintln!("WARN: Firefox needs to be closed to read its cookies!");
     }
 
     let mut cookie_dbs: HashSet<CookieDB> = HashSet::new();
@@ -62,19 +59,19 @@ fn main() -> Result<(), ()> {
             c.path.to_string_lossy().to_owned().contains(&args.profile)
         })
     {
-        errln!("No profile matching '{}' found", args.profile);
+        eprintln!("ERROR: No profile matching '{}' found", args.profile);
         std::process::exit(Config::global().err_exit);
     }
 
     if args.list_profiles {
-        infoln!("Profiles with a cookie database:");
+        println!("Profiles with a cookie database:");
         cookie_dbs.iter().for_each(|c| {
             println!("  {}", c.path_short());
         });
     }
     //== Subcmd: cookies ==//
     else if Config::global().list_fields {
-        infoln!("Valid fields:");
+        println!("Valid fields:");
         for field_name in COOKIE_FIELDS.keys() {
             println!("  {:?}", field_name);
         }
@@ -91,7 +88,7 @@ fn main() -> Result<(), ()> {
             }
             // Skip profile headings if --no-heading
             if !Config::global().no_heading {
-                infoln!("{}", cookie_db.path_short());
+                println!("{}", cookie_db.path_short());
             }
             // Load all fields from each cookie database
             cookie_db.load_cookies().expect("Failed to load cookies");
@@ -106,7 +103,6 @@ fn main() -> Result<(), ()> {
                         + &c.fields_as_str(
                             &Config::global().fields,
                             multiple_fields,
-                            !Config::global().nocolor,
                         )
                         + "\n";
 
@@ -136,15 +132,18 @@ fn main() -> Result<(), ()> {
             {
                 continue;
             }
-            infoln!("Cleaning {}", cookie_db.path_short());
+            if whitelist.is_empty() {
+                println!("WARN: Empty whitelist!");
+            }
+            println!("Cleaning {}", cookie_db.path_short());
             cookie_db
                 .clean(&whitelist, Config::global().apply)
                 .expect("Failed to delete cookies from database");
         }
         if Config::global().apply {
-            infoln!("Deletions committed");
+            println!("Deletions committed");
         } else {
-            infoln!("To perform deletions, pass `--apply`");
+            println!("To perform deletions, pass `--apply`");
         }
     }
     //== Subcmd: tui ==//

@@ -28,8 +28,6 @@ use crate::{
     util::copy_to_clipboard,
 };
 
-//============================================================================//
-
 /// Entrypoint for the TUI
 pub fn run(cookie_dbs: Vec<CookieDB>) -> Result<(), io::Error> {
     // Disable certain parts of the terminal's default behaviour
@@ -218,24 +216,20 @@ fn ui<B: Backend>(
                 );
 
                 //== Fields ==//
-                //debug_log(format!("Crash {:?} {:?} ",
-                //        state.current_cookies.items,
-                //        state.current_cookies.status.selected()
-                //));
                 if let Some(current_cookie) = state.selected_cookie() {
                     if let Some(cookie) =
                         cdb.cookie_for_domain(&current_cookie, &current_domain)
                     {
                         // Fill the current_fields state list
                         state.current_fields.items = vec![
-                            cookie.match_field("Value", true, false),
-                            cookie.match_field("Path", true, false),
-                            cookie.match_field("Creation", true, false),
-                            cookie.match_field("Expiry", true, false),
-                            cookie.match_field("LastAccess", true, false),
-                            cookie.match_field("HttpOnly", true, false),
-                            cookie.match_field("Secure", true, false),
-                            cookie.match_field("SameSite", true, false),
+                            cookie.match_field("Value", true),
+                            cookie.match_field("Path", true),
+                            cookie.match_field("Creation", true),
+                            cookie.match_field("Expiry", true),
+                            cookie.match_field("LastAccess", true),
+                            cookie.match_field("HttpOnly", true),
+                            cookie.match_field("Secure", true),
+                            cookie.match_field("SameSite", true),
                         ];
 
                         // Create list items for the UI

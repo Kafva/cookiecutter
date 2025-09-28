@@ -110,7 +110,7 @@ pub fn cookie_db_type(filepath: &Path) -> Result<DbType, io::Error> {
         }
     }
 
-    if let Ok(conn) = rusqlite::Connection::open(filepath) {
+    if let Ok(conn) = rusqlite::Connection::open_with_flags(filepath, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) {
         if is_db_with_table(&conn, "moz_cookies") {
             conn.close().unwrap();
             return Ok(DbType::Firefox);
